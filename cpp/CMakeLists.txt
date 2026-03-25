@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
-project(geotrack_core)
+project(bearings_core)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(GEOTRACK_SOURCES
-    src/GeotrackCore.cpp
+set(BEARINGS_SOURCES
+    src/BearingsCore.cpp
     src/Config.cpp
     src/Schedule.cpp
     src/Location.cpp
@@ -16,7 +16,7 @@ set(GEOTRACK_SOURCES
     vendor/sqlite3/sqlite3.c
 )
 
-set(GEOTRACK_COMPILE_DEFS
+set(BEARINGS_COMPILE_DEFS
     SQLITE_THREADSAFE=2
     SQLITE_DEFAULT_MEMSTATUS=0
     SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
@@ -27,20 +27,32 @@ set(GEOTRACK_COMPILE_DEFS
 
 if(ANDROID)
     # Android: build shared library with JNI bindings
-    add_library(geotrack_core SHARED
-        ${GEOTRACK_SOURCES}
-        ../android/src/main/cpp/geotrack_jni.cpp
+    add_library(bearings_core SHARED
+        ${BEARINGS_SOURCES}
+        ../android/src/main/cpp/bearings_jni.cpp
     )
-    target_link_libraries(geotrack_core log)
+    target_link_libraries(bearings_core log)
 else()
     # iOS / other: static library
-    add_library(geotrack_core STATIC ${GEOTRACK_SOURCES})
+    add_library(bearings_core STATIC ${BEARINGS_SOURCES})
 endif()
 
-target_include_directories(geotrack_core
+target_include_directories(bearings_core
     PUBLIC include
     PRIVATE vendor/sqlite3
     PRIVATE vendor
 )
 
-target_compile_definitions(geotrack_core PRIVATE ${GEOTRACK_COMPILE_DEFS})
+target_compile_definitions(bearings_core PRIVATE ${BEARINGS_COMPILE_DEFS})
+
+# Tests (only when building standalone, not as part of Android/iOS)
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    option(BEARINGS_BUILD_TESTS "Build C++ tests" ON)
+    if(BEARINGS_BUILD_TESTS)
+        enable_testing()
+        add_executable(bearings_tests test/test_core.cpp)
+        target_link_libraries(bearings_tests bearings_core)
+        target_include_directories(bearings_tests PRIVATE test vendor)
+        add_test(NAME core COMMAND bearings_tests)
+    endif()
+endif()

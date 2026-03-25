@@ -1,8 +1,8 @@
-#include "geotrack/LocationStore.h"
-#include "geotrack/Logger.h"
+#include "bearings/LocationStore.h"
+#include "bearings/Logger.h"
 #include "sqlite3.h"
 
-namespace geotrack {
+namespace bearings {
 
 LocationStore::LocationStore() = default;
 
@@ -210,4 +210,4 @@ Location LocationStore::rowToLocation(sqlite3_stmt* stmt) {
     return loc;
 }
 
-} // namespace geotrack
+} // namespace bearings

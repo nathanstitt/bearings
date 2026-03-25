@@ -9,14 +9,14 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import type { Config } from 'geotrack';
-import { configure } from 'geotrack';
+import type { Config } from 'bearings';
+import { configure } from 'bearings';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import SettingsSection from '../components/SettingsSection';
 import SettingsRow from '../components/SettingsRow';
 import { COLORS, ACCURACY_OPTIONS, DEFAULT_CONFIG } from '../lib/config';
 import { loadSettings, saveSettings } from '../lib/settingsStorage';
-import { useGeotrack } from '../App';
+import { useBearings } from '../App';
 
 type RootStackParamList = {
   Home: undefined;
@@ -27,7 +27,7 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
-  const { schedulerRunning, startSchedule, stopSchedule } = useGeotrack();
+  const { schedulerRunning, startSchedule, stopSchedule } = useBearings();
   const [settings, setSettings] = useState<Partial<Config>>({
     ...DEFAULT_CONFIG,
   });

@@ -1,5 +1,6 @@
-#include "geotrack/Location.h"
+#include "bearings/Location.h"
 #include <nlohmann/json.hpp>
+#include <cmath>
 #include <sstream>
 #include <iomanip>
 #include <random>
@@ -7,7 +8,7 @@
 
 using json = nlohmann::json;
 
-namespace geotrack {
+namespace bearings {
 
 namespace {
 
@@ -105,4 +106,20 @@ std::string Location::toJsonArray(const std::vector<Location>& locations) {
     return arr.dump();
 }
 
-} // namespace geotrack
+double Location::distanceTo(const Location& other) const {
+    constexpr double DEG_TO_RAD = 3.14159265358979323846 / 180.0;
+    constexpr double EARTH_RADIUS = 6371000.0; // meters
+
+    double lat1 = latitude * DEG_TO_RAD;
+    double lat2 = other.latitude * DEG_TO_RAD;
+    double dlat = (other.latitude - latitude) * DEG_TO_RAD;
+    double dlon = (other.longitude - longitude) * DEG_TO_RAD;
+
+    double a = std::sin(dlat / 2) * std::sin(dlat / 2) +
+               std::cos(lat1) * std::cos(lat2) *
+               std::sin(dlon / 2) * std::sin(dlon / 2);
+    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
+    return EARTH_RADIUS * c;
+}
+
+} // namespace bearings

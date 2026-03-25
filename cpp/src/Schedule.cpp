@@ -1,10 +1,10 @@
-#include "geotrack/Schedule.h"
-#include "geotrack/Logger.h"
+#include "bearings/Schedule.h"
+#include "bearings/Logger.h"
 
 #include <algorithm>
 #include <sstream>
 
-namespace geotrack {
+namespace bearings {
 
 namespace {
 
@@ -236,4 +236,4 @@ EvalResult Schedule::evaluate(int year, int month, int dayOfMonth, int dayOfWeek
     return result;
 }
 
-} // namespace geotrack
+} // namespace bearings

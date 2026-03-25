@@ -10,7 +10,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import SettingsSection from '../components/SettingsSection';
 import SettingsRow from '../components/SettingsRow';
 import { COLORS, RADIUS_OPTIONS } from '../lib/config';
-import { useGeotrack } from '../App';
+import { useBearings } from '../App';
 
 type RootStackParamList = {
   Home: undefined;
@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AddGeofence'>;
 
 export default function AddGeofenceScreen({ route, navigation }: Props) {
   const { latitude, longitude } = route.params;
-  const { addGeofence: ctxAddGeofence } = useGeotrack();
+  const { addGeofence: ctxAddGeofence } = useBearings();
 
   const [identifier, setIdentifier] = useState('');
   const [radius, setRadius] = useState(150);

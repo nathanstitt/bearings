@@ -10,12 +10,12 @@
 
     <application>
         <service
-            android:name=".GeotrackForegroundService"
+            android:name=".BearingsForegroundService"
             android:foregroundServiceType="location"
             android:exported="false" />
 
-        <receiver android:name=".GeotrackActivityReceiver" android:exported="false" />
-        <receiver android:name=".GeotrackGeofenceReceiver" android:exported="false" />
-        <receiver android:name=".GeotrackScheduleReceiver" android:exported="false" />
+        <receiver android:name=".BearingsActivityReceiver" android:exported="false" />
+        <receiver android:name=".BearingsGeofenceReceiver" android:exported="false" />
+        <receiver android:name=".BearingsScheduleReceiver" android:exported="false" />
     </application>
 </manifest>

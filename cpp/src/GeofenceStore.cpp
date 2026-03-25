@@ -1,8 +1,8 @@
-#include "geotrack/GeofenceStore.h"
-#include "geotrack/Logger.h"
+#include "bearings/GeofenceStore.h"
+#include "bearings/Logger.h"
 #include "sqlite3.h"
 
-namespace geotrack {
+namespace bearings {
 
 GeofenceStore::GeofenceStore() = default;
 
@@ -189,4 +189,4 @@ Geofence GeofenceStore::rowToGeofence(sqlite3_stmt* stmt) {
     return g;
 }
 
-} // namespace geotrack
+} // namespace bearings

@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import TrackingMap, { type TrackingMapRef } from '../components/TrackingMap';
 import BottomToolbar from '../components/BottomToolbar';
 import FABMenu from '../components/FABMenu';
-import { useGeotrack } from '../App';
+import { useBearings } from '../App';
 
 type RootStackParamList = {
   Home: undefined;
@@ -27,7 +27,7 @@ export default function HomeScreen({ navigation }: Props) {
     stopTracking,
     clearLocations,
     resetDistance,
-  } = useGeotrack();
+  } = useBearings();
 
   const handleToggleTracking = useCallback(() => {
     if (tracking) {

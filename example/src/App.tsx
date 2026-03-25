@@ -29,7 +29,7 @@ import {
   type Geofence,
   type GeofenceEvent,
   type ScheduleEvent,
-} from 'geotrack';
+} from 'bearings';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import AddGeofenceScreen from './screens/AddGeofenceScreen';
@@ -40,7 +40,7 @@ import { haversineDistance } from './lib/geo';
 
 // --- Context ---
 
-interface GeotrackContextValue {
+interface BearingsContextValue {
   tracking: boolean;
   isMoving: boolean;
   schedulerRunning: boolean;
@@ -61,12 +61,12 @@ interface GeotrackContextValue {
   removeAllGeofences: () => Promise<void>;
 }
 
-const GeotrackContext = createContext<GeotrackContextValue | null>(null);
+const BearingsContext = createContext<BearingsContextValue | null>(null);
 
-export function useGeotrack(): GeotrackContextValue {
-  const ctx = useContext(GeotrackContext);
+export function useBearings(): BearingsContextValue {
+  const ctx = useContext(BearingsContext);
   if (!ctx) {
-    throw new Error('useGeotrack must be used within GeotrackProvider');
+    throw new Error('useBearings must be used within a BearingsProvider');
   }
   return ctx;
 }
@@ -75,7 +75,7 @@ export function useGeotrack(): GeotrackContextValue {
 
 const MAX_LOCATIONS = 1000;
 
-function GeotrackProvider({ children }: { children: ReactNode }) {
+function BearingsProvider({ children }: { children: ReactNode }) {
   const [tracking, setTracking] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -132,13 +132,13 @@ function GeotrackProvider({ children }: { children: ReactNode }) {
     const motionSub = onMotionChange((event) => {
       setIsMoving(event.isMoving);
       console.log(
-        `[Geotrack] Motion change: ${event.isMoving ? 'MOVING' : 'STATIONARY'}`
+        `[Bearings] Motion change: ${event.isMoving ? 'MOVING' : 'STATIONARY'}`
       );
     });
 
     const geofenceSub = onGeofence((event) => {
       setGeofenceEvents((prev) => [event, ...prev].slice(0, 100));
-      console.log(`[Geotrack] Geofence: ${event.action} ${event.identifier}`);
+      console.log(`[Bearings] Geofence: ${event.action} ${event.identifier}`);
     });
 
     const scheduleSub = onSchedule((event) => {
@@ -146,7 +146,7 @@ function GeotrackProvider({ children }: { children: ReactNode }) {
       setTracking(event.enabled);
       setIsMoving(event.enabled);
       console.log(
-        `[Geotrack] Schedule: tracking ${event.enabled ? 'started' : 'stopped'}`
+        `[Bearings] Schedule: tracking ${event.enabled ? 'started' : 'stopped'}`
       );
     });
 
@@ -214,7 +214,7 @@ function GeotrackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <GeotrackContext.Provider
+    <BearingsContext.Provider
       value={{
         tracking,
         isMoving,
@@ -237,7 +237,7 @@ function GeotrackProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </GeotrackContext.Provider>
+    </BearingsContext.Provider>
   );
 }
 
@@ -252,7 +252,7 @@ type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function HeaderSwitch() {
-  const { tracking, startTracking, stopTracking } = useGeotrack();
+  const { tracking, startTracking, stopTracking } = useBearings();
 
   return (
     <Switch
@@ -271,14 +271,14 @@ function HeaderSwitch() {
 
 export default function App() {
   return (
-    <GeotrackProvider>
+    <BearingsProvider>
       <NavigationContainer>
         <Stack.Navigator>
           <Stack.Screen
             name="Home"
             component={HomeScreen}
             options={{
-              title: 'Geotrack',
+              title: 'Bearings',
               headerRight: HeaderSwitch,
             }}
           />
@@ -294,6 +294,6 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-    </GeotrackProvider>
+    </BearingsProvider>
   );
 }

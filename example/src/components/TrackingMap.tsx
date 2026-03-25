@@ -14,7 +14,7 @@ import MapView, {
   type LongPressEvent,
 } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import type { Location, Geofence, GeofenceEvent } from 'geotrack';
+import type { Location, Geofence, GeofenceEvent } from 'bearings';
 import { COLORS, GEOFENCE_COLORS } from '../lib/config';
 
 export interface TrackingMapRef {

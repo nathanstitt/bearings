@@ -1,4 +1,4 @@
-# Geotrack
+# Bearings
 
 Battery-conscious background location tracking & geofencing SDK for React Native.
 
@@ -16,7 +16,7 @@ Built as a [Turbo Module](https://reactnative.dev/docs/the-new-architecture/pill
 ## Installation
 
 ```sh
-yarn add geotrack
+yarn add bearings
 ```
 
 ### iOS
@@ -40,7 +40,7 @@ import {
   onMotionChange,
   addGeofence,
   onGeofence,
-} from 'geotrack';
+} from 'bearings';
 
 // Configure
 await configure({

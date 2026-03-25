@@ -1,9 +1,9 @@
-#include "geotrack/Config.h"
+#include "bearings/Config.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-namespace geotrack {
+namespace bearings {
 
 Config Config::fromJson(const std::string& jsonStr) {
     Config config;
@@ -45,4 +45,4 @@ std::string Config::toJson() const {
     return j.dump();
 }
 
-} // namespace geotrack
+} // namespace bearings

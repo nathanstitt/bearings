@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Geotrack Example",
-    "slug": "geotrack-example",
+    "name": "Bearings Example",
+    "slug": "bearings-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.geotrack.example",
+      "bundleIdentifier": "com.bearings.example",
       "infoPlist": {
         "UIBackgroundModes": ["location"]
       }
@@ -25,7 +25,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.geotrack.example"
+      "package": "com.bearings.example"
     },
     "web": {
       "favicon": "./assets/favicon.png"

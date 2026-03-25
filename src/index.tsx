@@ -1,5 +1,5 @@
 import { NativeEventEmitter } from 'react-native';
-import NativeGeotrack from './NativeGeotrack';
+import NativeBearings from './NativeBearings';
 import type {
   ActivityChangeEvent,
   Config,
@@ -26,57 +26,57 @@ export type {
   Subscription,
 } from './types';
 
-const emitter = new NativeEventEmitter(NativeGeotrack);
+const emitter = new NativeEventEmitter(NativeBearings);
 
 export async function configure(config: Partial<Config>): Promise<State> {
   const json = JSON.stringify(config);
-  const result = await NativeGeotrack.configure(json);
+  const result = await NativeBearings.configure(json);
   return JSON.parse(result) as State;
 }
 
 export async function start(): Promise<State> {
-  const result = await NativeGeotrack.start();
+  const result = await NativeBearings.start();
   return JSON.parse(result) as State;
 }
 
 export async function stop(): Promise<State> {
-  const result = await NativeGeotrack.stop();
+  const result = await NativeBearings.stop();
   return JSON.parse(result) as State;
 }
 
 export async function getState(): Promise<State> {
-  const result = await NativeGeotrack.getState();
+  const result = await NativeBearings.getState();
   return JSON.parse(result) as State;
 }
 
 export async function getLocations(): Promise<Location[]> {
-  const result = await NativeGeotrack.getLocations();
+  const result = await NativeBearings.getLocations();
   return JSON.parse(result) as Location[];
 }
 
 export async function getCount(): Promise<number> {
-  return NativeGeotrack.getCount();
+  return NativeBearings.getCount();
 }
 
 export async function destroyLocations(): Promise<boolean> {
-  return NativeGeotrack.destroyLocations();
+  return NativeBearings.destroyLocations();
 }
 
 export async function addGeofence(geofence: Geofence): Promise<boolean> {
   const json = JSON.stringify(geofence);
-  return NativeGeotrack.addGeofence(json);
+  return NativeBearings.addGeofence(json);
 }
 
 export async function removeGeofence(identifier: string): Promise<boolean> {
-  return NativeGeotrack.removeGeofence(identifier);
+  return NativeBearings.removeGeofence(identifier);
 }
 
 export async function removeGeofences(): Promise<boolean> {
-  return NativeGeotrack.removeGeofences();
+  return NativeBearings.removeGeofences();
 }
 
 export async function getGeofences(): Promise<Geofence[]> {
-  const result = await NativeGeotrack.getGeofences();
+  const result = await NativeBearings.getGeofences();
   return JSON.parse(result) as Geofence[];
 }
 
@@ -107,12 +107,12 @@ export function onLocation(
 }
 
 export async function startSchedule(): Promise<State> {
-  const result = await NativeGeotrack.startSchedule();
+  const result = await NativeBearings.startSchedule();
   return JSON.parse(result) as State;
 }
 
 export async function stopSchedule(): Promise<State> {
-  const result = await NativeGeotrack.stopSchedule();
+  const result = await NativeBearings.stopSchedule();
   return JSON.parse(result) as State;
 }
 

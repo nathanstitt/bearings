@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Geotrack is a React Native Turbo Module for battery-conscious background location tracking and geofencing. The core logic is implemented in shared C++17, with thin platform bridges for iOS (Objective-C++) and Android (Kotlin + JNI).
+Bearings is a React Native Turbo Module for battery-conscious background location tracking and geofencing. The core logic is implemented in shared C++17, with thin platform bridges for iOS (Objective-C++) and Android (Kotlin + JNI).
 
 ## Commands
 
@@ -25,17 +25,17 @@ yarn example android    # Build & run example app on Android
 ### Three-layer design
 
 1. **C++ core** (`cpp/`) — All business logic: state machine, location storage (SQLite), config management. Platform-agnostic.
-   - `GeotrackCore` — Main entry point. Owns the state machine (UNKNOWN → MOVING ↔ STATIONARY), config, and location store.
+   - `BearingsCore` — Main entry point. Owns the state machine (UNKNOWN → MOVING ↔ STATIONARY), config, and location store.
    - `PlatformBridge` — Abstract interface that platform layers implement to provide OS-specific capabilities (location updates, geofencing, motion activity, timers).
    - `LocationStore` — SQLite-backed persistent location storage.
    - Built via CMake. Android builds a shared library (with JNI); iOS builds a static library (sources compiled via CocoaPods).
 
 2. **Platform bridges** — Implement `PlatformBridge` in native code:
-   - **iOS** (`ios/`) — `GeotrackPlatformBridge.mm` implements the C++ `PlatformBridge`. `GeotrackLocationDelegate` wraps `CLLocationManager`. `Geotrack.mm` is the Turbo Module entry point.
-   - **Android** (`android/`) — `GeotrackPlatformBridge.kt` calls C++ via JNI (`android/src/main/cpp/geotrack_jni.cpp`). `GeotrackLocationService.kt` uses FusedLocationProvider. `GeotrackForegroundService.kt` keeps tracking alive in background. `GeotrackModule.kt` is the Turbo Module entry point.
+   - **iOS** (`ios/`) — `BearingsPlatformBridge.mm` implements the C++ `PlatformBridge`. `BearingsLocationDelegate` wraps `CLLocationManager`. `Bearings.mm` is the Turbo Module entry point.
+   - **Android** (`android/`) — `BearingsPlatformBridge.kt` calls C++ via JNI (`android/src/main/cpp/bearings_jni.cpp`). `BearingsLocationService.kt` uses FusedLocationProvider. `BearingsForegroundService.kt` keeps tracking alive in background. `BearingsModule.kt` is the Turbo Module entry point.
 
 3. **TypeScript layer** (`src/`) — Thin wrapper over the Turbo Module. All native methods exchange JSON strings which are parsed/serialized at the JS boundary.
-   - `NativeGeotrack.ts` — TurboModule spec (codegen input).
+   - `NativeBearings.ts` — TurboModule spec (codegen input).
    - `index.tsx` — Public API: `configure`, `start`, `stop`, `getState`, `getLocations`, `getCount`, `destroyLocations`, `onLocation`, `onMotionChange`.
    - `types.ts` — TypeScript interfaces for `Location`, `Config`, `State`, `MotionChangeEvent`.
 
@@ -43,7 +43,7 @@ yarn example android    # Build & run example app on Android
 
 - **JSON string bridge**: Native methods accept/return JSON strings (not typed objects) across the JS↔Native boundary. The TypeScript layer handles `JSON.stringify`/`JSON.parse`.
 - **Event emission**: Native events (`location`, `motionchange`, `error`) are dispatched via `NativeEventEmitter`. The C++ core calls `PlatformBridge::dispatchEvent()` which routes through each platform's event system.
-- **Vendored C dependencies** in `cpp/vendor/`: SQLite (`sqlite3/`) and nlohmann/json (`nlohmann/json.hpp`). Both are compiled/included with specific flags (see `CMakeLists.txt` and `Geotrack.podspec`). Use nlohmann/json for all JSON construction and parsing in C++ code.
+- **Vendored C dependencies** in `cpp/vendor/`: SQLite (`sqlite3/`) and nlohmann/json (`nlohmann/json.hpp`). Both are compiled/included with specific flags (see `CMakeLists.txt` and `Bearings.podspec`). Use nlohmann/json for all JSON construction and parsing in C++ code.
 
 ## Commit Convention
 

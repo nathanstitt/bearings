@@ -1,5 +1,5 @@
 {
-  "name": "geotrack",
+  "name": "bearings",
   "version": "0.1.0",
   "description": "Background Geolocation, battery-conscious background location-tracking & geofencing SDKReact Native Background Geolocation",
   "main": "./lib/module/index.js",
@@ -32,14 +32,15 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace geotrack-example",
+    "example": "yarn workspace bearings-example",
     "clean": "del-cli lib",
     "prepare": "bob build",
     "typecheck": "tsc",
-    "test": "NODE_OPTIONS=\"--localstorage-file=$(mktemp ${TMPDIR:-/tmp}/jest-ls.XXXXXX)\" jest --runInBand",
+    "test": "yarn test:core",
     "release": "release-it --only-version",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "build:ios": "xcodebuild -workspace example/ios/GeotrackExample.xcworkspace -scheme GeotrackExample -sdk iphonesimulator -configuration Debug build"
+    "test:core": "cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1 && cmake --build cpp/build --target bearings_tests 2>&1 && cpp/build/bearings_tests",
+    "build:ios": "xcodebuild -workspace example/ios/BearingsExample.xcworkspace -scheme BearingsExample -sdk iphonesimulator -configuration Debug build"
   },
   "keywords": [
     "react-native",
@@ -111,11 +112,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "GeotrackSpec",
+    "name": "BearingsSpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.geotrack"
+      "javaPackageName": "com.bearings"
     }
   },
   "jest": {
@@ -123,10 +124,6 @@
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"
-    ],
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "<rootDir>/src/__tests__/harness/"
     ]
   },
   "commitlint": {

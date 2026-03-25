@@ -1,6 +1,6 @@
-#include "geotrack/Logger.h"
+#include "bearings/Logger.h"
 
-namespace geotrack {
+namespace bearings {
 
 Logger& Logger::instance() {
     static Logger logger;
@@ -38,4 +38,4 @@ void Logger::log(LogLevel level, const std::string& message) {
     }
 }
 
-} // namespace geotrack
+} // namespace bearings
