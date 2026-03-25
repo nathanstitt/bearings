@@ -1,2 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <service
+            android:name=".GeotrackForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <receiver android:name=".GeotrackActivityReceiver" android:exported="false" />
+        <receiver android:name=".GeotrackGeofenceReceiver" android:exported="false" />
+        <receiver android:name=".GeotrackScheduleReceiver" android:exported="false" />
+    </application>
 </manifest>
