@@ -1,6 +1,6 @@
 {
   "name": "geomony",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Battery-conscious React Native background location tracking & geofencing SDK",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
