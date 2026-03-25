@@ -23,7 +23,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "WebFetch(domain:registry.npmjs.org)",
-      "Bash(cpp/build/geomony_tests 2>&1)"
+      "Bash(cpp/build/geomony_tests 2>&1)",
+      "Bash(npm pack:*)"
     ]
   },
   "sandbox": {

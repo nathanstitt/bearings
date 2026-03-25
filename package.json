@@ -1,7 +1,7 @@
 {
   "name": "geomony",
-  "version": "0.1.0",
-  "description": "Background Geolocation, battery-conscious background location-tracking & geofencing SDKReact Native Background Geolocation",
+  "version": "0.0.0",
+  "description": "Battery-conscious React Native background location tracking & geofencing SDK",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
@@ -26,6 +26,8 @@
     "!android/gradlew",
     "!android/gradlew.bat",
     "!android/local.properties",
+    "!cpp/build",
+    "!cpp/test",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
@@ -49,14 +51,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nathanstitt.git"
+    "url": "git+https://github.com/nathanstitt/geomony.git"
   },
   "author": "Nathan Stitt <nathan@stitt.org> (https://github.com/nathanstitt)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/nathanstitt/issues"
+    "url": "https://github.com/nathanstitt/geomony/issues"
   },
-  "homepage": "https://github.com/nathanstitt#readme",
+  "homepage": "https://github.com/nathanstitt/geomony#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
