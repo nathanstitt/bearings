@@ -129,6 +129,39 @@ geofenceSub.remove();
 | `startSchedule()` | `Promise<State>` | Start schedule-based tracking. |
 | `stopSchedule()` | `Promise<State>` | Stop schedule-based tracking. |
 
+Schedule-based tracking automatically starts and stops tracking during configured time windows. Outside those windows, all location monitoring is completely off — no GPS, no geofences, no motion activity.
+
+Configure schedule rules as an array of strings in the `schedule` config option. Each rule has the format `"<days> <startTime>-<endTime>"`.
+
+**Day-of-week rules** use 1=Sunday through 7=Saturday. Days can be individual values or ranges, comma-separated:
+
+```typescript
+await configure({
+  schedule: [
+    '2-6 09:00-17:00',       // Mon–Fri, 9am–5pm
+    '7 10:00-14:00',         // Saturday, 10am–2pm
+    '1 00:00-00:00',         // Sunday, all day (midnight to midnight)
+    '2,4,6 18:00-22:00',     // Mon, Wed, Fri evenings
+    '5 22:00-06:00',         // Thursday night into Friday morning (crosses midnight)
+  ],
+});
+await startSchedule();
+```
+
+**Literal date rules** use `YYYY-MM-DD` format for one-off windows:
+
+```typescript
+await configure({
+  schedule: [
+    '2026-04-15 08:00-20:00',  // April 15th only, 8am–8pm
+  ],
+});
+```
+
+When multiple rules overlap, tracking is active if *any* rule matches. The scheduler evaluates rules at each transition boundary and sets a timer for the next one — it does not poll on an interval. An `onSchedule` event fires when tracking starts or stops due to the schedule.
+
+**Platform note:** On Android, schedule timers use `AlarmManager.setExactAndAllowWhileIdle`, which reliably wakes the app from the background. On iOS, schedule evaluation piggybacks on incoming location events — `dispatch_source` timers do not fire while the app is suspended. This means schedule transitions on iOS may be delayed until the next location update or geofence event wakes the app.
+
 ### Events
 
 | Function | Event Data | Description |
