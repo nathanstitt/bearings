@@ -30,6 +30,12 @@ public:
 
     virtual void startScheduleTimer(int delaySeconds) = 0;
     virtual void cancelScheduleTimer() = 0;
+
+    virtual void sendHTTPRequest(const std::string& url,
+                                 const std::string& jsonPayload,
+                                 int requestId) = 0;
+    virtual void startSyncRetryTimer(int delaySeconds) = 0;
+    virtual void cancelSyncRetryTimer() = 0;
 };
 
 } // namespace bearings

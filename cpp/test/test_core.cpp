@@ -259,6 +259,292 @@ TEST(geofence_exit_transitions_to_moving) {
     ASSERT_TRUE(state["isMoving"].get<bool>());
 }
 
+// ---- Sync tests ----
+
+// Helper: build a sync-configured core
+struct SyncTestHarness {
+    std::shared_ptr<test::MockPlatformBridge> bridge;
+    std::unique_ptr<BearingsCore> core;
+
+    SyncTestHarness(int syncThreshold = 5, int maxBatchSize = 100) {
+        bridge = std::make_shared<test::MockPlatformBridge>();
+        core = std::make_unique<BearingsCore>(bridge);
+        json config = {
+            {"distanceFilter", 0},
+            {"url", "https://example.com/locations"},
+            {"syncThreshold", syncThreshold},
+            {"maxBatchSize", maxBatchSize},
+            {"syncRetryBaseSeconds", 10},
+        };
+        core->configure(config.dump());
+        core->start();
+        bridge->clearEvents();
+    }
+
+    void insertLocations(int count) {
+        for (int i = 0; i < count; i++) {
+            Location loc = makeLoc(40.0 + i * 0.001, -74.0);
+            core->onLocationReceived(loc);
+        }
+    }
+
+    void addTestGeofence(const std::string& identifier) {
+        json g = {
+            {"identifier", identifier},
+            {"latitude", 40.0},
+            {"longitude", -74.0},
+            {"radius", 200.0},
+            {"notifyOnEntry", true},
+            {"notifyOnExit", true},
+        };
+        core->addGeofence(g.dump());
+    }
+};
+
+TEST(sync_disabled_when_no_url) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    BearingsCore core(bridge);
+    json config = {{"distanceFilter", 0}, {"syncThreshold", 1}};
+    core.configure(config.dump());
+    core.start();
+
+    core.onLocationReceived(makeLoc(40.0, -74.0));
+
+    ASSERT_FALSE(bridge->sendWasCalled);
+}
+
+TEST(sync_not_triggered_below_threshold) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(4);
+
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+}
+
+TEST(sync_triggered_at_threshold) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(5);
+
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    // Verify payload contains 5 locations
+    json payload = json::parse(h.bridge->lastSendPayload);
+    ASSERT_EQ(payload["location"].size(), 5u);
+    ASSERT_EQ(h.bridge->lastSendUrl, "https://example.com/locations");
+}
+
+TEST(sync_success_marks_synced) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(5);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, true);
+
+    // All should be synced now — getUnsyncedCount via getState
+    json state = json::parse(h.core->getState());
+    ASSERT_EQ(state["sync"]["unsyncedCount"].get<int>(), 0);
+}
+
+TEST(sync_success_flushes_remaining) {
+    SyncTestHarness h(3, 3); // threshold=3, maxBatch=3
+
+    h.insertLocations(7); // triggers sync at 3, then at 6
+    // First sync in flight with 3 locations
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    json p1 = json::parse(h.bridge->lastSendPayload);
+    ASSERT_EQ(p1["location"].size(), 3u);
+    int rid1 = h.bridge->lastSendRequestId;
+
+    // Complete first sync — should trigger second sync (4 remain unsynced)
+    h.bridge->sendWasCalled = false;
+    h.core->onSyncComplete(rid1, true);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    json p2 = json::parse(h.bridge->lastSendPayload);
+    ASSERT_EQ(p2["location"].size(), 3u);
+    int rid2 = h.bridge->lastSendRequestId;
+
+    // Complete second sync — should trigger third (1 remains)
+    h.bridge->sendWasCalled = false;
+    h.core->onSyncComplete(rid2, true);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    json p3 = json::parse(h.bridge->lastSendPayload);
+    ASSERT_EQ(p3["location"].size(), 1u);
+    int rid3 = h.bridge->lastSendRequestId;
+
+    // Complete third — all synced
+    h.core->onSyncComplete(rid3, true);
+    json state = json::parse(h.core->getState());
+    ASSERT_EQ(state["sync"]["unsyncedCount"].get<int>(), 0);
+}
+
+TEST(sync_failure_schedules_retry) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(5);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+
+    ASSERT_TRUE(h.bridge->syncRetryTimerRunning);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 10); // base = 10s
+    // Locations still unsynced
+    json state = json::parse(h.core->getState());
+    ASSERT_EQ(state["sync"]["unsyncedCount"].get<int>(), 5);
+}
+
+TEST(sync_backoff_increases_exponentially) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+
+    // Fail 1: 10s
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 10);
+
+    // Retry timer fires, sync retries
+    h.bridge->sendWasCalled = false;
+    h.core->onSyncRetryTimerFired();
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    // Fail 2: 20s
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 20);
+
+    // Fail 3: 40s
+    h.core->onSyncRetryTimerFired();
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 40);
+
+    // Fail 4: 80s
+    h.core->onSyncRetryTimerFired();
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 80);
+
+    // Fail 5: 160s
+    h.core->onSyncRetryTimerFired();
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 160);
+
+    // Fail 6: capped at 300s
+    h.core->onSyncRetryTimerFired();
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 300);
+}
+
+TEST(sync_failure_blocks_further_syncs) {
+    SyncTestHarness h(3);
+
+    h.insertLocations(3); // triggers sync
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    // Fail
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    h.bridge->sendWasCalled = false;
+
+    // Insert more — should NOT trigger sync (connected_ = false)
+    h.insertLocations(3);
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+}
+
+TEST(connectivity_restored_flushes) {
+    SyncTestHarness h(3);
+
+    // Go offline
+    h.core->onConnectivityChange(false);
+
+    // Insert locations while offline
+    h.insertLocations(5);
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+
+    // Come back online
+    h.core->onConnectivityChange(true);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    json payload = json::parse(h.bridge->lastSendPayload);
+    ASSERT_EQ(payload["location"].size(), 5u);
+}
+
+TEST(connectivity_restored_resets_backoff) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+
+    // Fail 1 → 10s
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 10);
+
+    // Fail 2 → 20s
+    h.core->onSyncRetryTimerFired();
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 20);
+
+    // Connectivity restored → resets backoff
+    h.core->onConnectivityChange(true);
+    // Sync fires, then fails again
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    // Should be back to base 10s, not 40s
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 10);
+}
+
+TEST(geofence_event_triggers_immediate_sync) {
+    SyncTestHarness h(100); // Very high threshold
+
+    h.insertLocations(1); // way below threshold
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+
+    // Add a geofence and trigger an event
+    h.addTestGeofence("office");
+    h.core->onGeofenceEvent("office", "ENTER");
+
+    // Sync should fire despite being below threshold
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+}
+
+TEST(no_concurrent_syncs) {
+    SyncTestHarness h(3);
+
+    h.insertLocations(3); // triggers sync
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    ASSERT_EQ(h.bridge->sendCallCount, 1);
+
+    // Insert more while sync is in flight
+    h.insertLocations(3);
+    // Should NOT fire another sendHTTPRequest
+    ASSERT_EQ(h.bridge->sendCallCount, 1);
+
+    // Complete the first sync
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, true);
+    // Now the second batch should sync
+    ASSERT_EQ(h.bridge->sendCallCount, 2);
+}
+
+TEST(stale_callback_ignored) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(5);
+    int staleRequestId = h.bridge->lastSendRequestId;
+
+    // Stop (resets sync state)
+    h.core->stop();
+
+    // Stale callback arrives — should not crash or mark anything
+    h.core->onSyncComplete(staleRequestId, true);
+
+    // Restart and verify locations are still unsynced
+    h.core->start();
+    json state = json::parse(h.core->getState());
+    ASSERT_EQ(state["sync"]["unsyncedCount"].get<int>(), 5);
+}
+
+TEST(stop_cancels_sync_retry_timer) {
+    SyncTestHarness h(5);
+
+    h.insertLocations(5);
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false);
+    ASSERT_TRUE(h.bridge->syncRetryTimerRunning);
+
+    h.core->stop();
+    ASSERT_FALSE(h.bridge->syncRetryTimerRunning);
+}
+
 int main() {
     return test::run();
 }

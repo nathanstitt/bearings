@@ -106,6 +106,35 @@ std::string Location::toJsonArray(const std::vector<Location>& locations) {
     return arr.dump();
 }
 
+std::string Location::toSyncJson() const {
+    json j = {
+        {"uuid", uuid},
+        {"timestamp", timestamp},
+        {"latitude", latitude},
+        {"longitude", longitude},
+        {"altitude", altitude},
+        {"speed", speed},
+        {"heading", heading},
+        {"accuracy", accuracy},
+        {"speed_accuracy", speedAccuracy},
+        {"heading_accuracy", headingAccuracy},
+        {"altitude_accuracy", altitudeAccuracy},
+        {"is_moving", isMoving},
+        {"activity", {{"type", activityType}, {"confidence", activityConfidence}}},
+        {"event", event},
+        {"extras", extras},
+    };
+    return j.dump();
+}
+
+std::string Location::toSyncJsonArray(const std::vector<Location>& locations) {
+    json arr = json::array();
+    for (const auto& loc : locations) {
+        arr.push_back(json::parse(loc.toSyncJson()));
+    }
+    return arr.dump();
+}
+
 double Location::distanceTo(const Location& other) const {
     constexpr double DEG_TO_RAD = 3.14159265358979323846 / 180.0;
     constexpr double EARTH_RADIUS = 6371000.0; // meters

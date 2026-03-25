@@ -23,6 +23,9 @@ void Config::merge(const std::string& jsonStr) {
     if (j.contains("stopOnTerminate")) stopOnTerminate = j["stopOnTerminate"].get<bool>();
     if (j.contains("startOnBoot")) startOnBoot = j["startOnBoot"].get<bool>();
     if (j.contains("url")) url = j["url"].get<std::string>();
+    if (j.contains("syncThreshold")) syncThreshold = j["syncThreshold"].get<int>();
+    if (j.contains("maxBatchSize")) maxBatchSize = j["maxBatchSize"].get<int>();
+    if (j.contains("syncRetryBaseSeconds")) syncRetryBaseSeconds = j["syncRetryBaseSeconds"].get<int>();
     if (j.contains("enabled")) enabled = j["enabled"].get<bool>();
     if (j.contains("schedule")) schedule = j["schedule"].get<std::vector<std::string>>();
     if (j.contains("scheduleUseAlarmManager")) scheduleUseAlarmManager = j["scheduleUseAlarmManager"].get<bool>();
@@ -38,6 +41,9 @@ std::string Config::toJson() const {
         {"stopOnTerminate", stopOnTerminate},
         {"startOnBoot", startOnBoot},
         {"url", url},
+        {"syncThreshold", syncThreshold},
+        {"maxBatchSize", maxBatchSize},
+        {"syncRetryBaseSeconds", syncRetryBaseSeconds},
         {"enabled", enabled},
         {"schedule", schedule},
         {"scheduleUseAlarmManager", scheduleUseAlarmManager},

@@ -21,6 +21,9 @@ public:
     std::vector<Location> getAll();
     int getCount();
     bool destroyAll();
+    std::vector<Location> getUnsynced(int limit);
+    int getUnsyncedCount();
+    bool markSynced(const std::vector<int64_t>& ids);
 
 private:
     void createTable();

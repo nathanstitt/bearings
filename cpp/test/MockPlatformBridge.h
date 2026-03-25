@@ -83,6 +83,34 @@ public:
     void startScheduleTimer(int) override {}
     void cancelScheduleTimer() override {}
 
+    // Sync tracking
+    bool syncRetryTimerRunning = false;
+    int syncRetryTimerDelay = 0;
+    int lastSendRequestId = 0;
+    std::string lastSendUrl;
+    std::string lastSendPayload;
+    bool sendWasCalled = false;
+    int sendCallCount = 0;
+
+    void sendHTTPRequest(const std::string& url,
+                         const std::string& jsonPayload,
+                         int requestId) override {
+        sendWasCalled = true;
+        sendCallCount++;
+        lastSendUrl = url;
+        lastSendPayload = jsonPayload;
+        lastSendRequestId = requestId;
+    }
+
+    void startSyncRetryTimer(int delaySeconds) override {
+        syncRetryTimerRunning = true;
+        syncRetryTimerDelay = delaySeconds;
+    }
+
+    void cancelSyncRetryTimer() override {
+        syncRetryTimerRunning = false;
+    }
+
     // --- Helpers for tests ---
 
     std::vector<DispatchedEvent> eventsNamed(const std::string& name) const {

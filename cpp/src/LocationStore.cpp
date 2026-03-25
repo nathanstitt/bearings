@@ -172,6 +172,77 @@ bool LocationStore::destroyAll() {
     return true;
 }
 
+std::vector<Location> LocationStore::getUnsynced(int limit) {
+    std::vector<Location> locations;
+    if (!db_) return locations;
+
+    const char* sql = "SELECT * FROM locations WHERE synced = 0 ORDER BY id ASC LIMIT ?;";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        Logger::instance().error("Failed to prepare getUnsynced: " + std::string(sqlite3_errmsg(db_)));
+        return locations;
+    }
+
+    sqlite3_bind_int(stmt, 1, limit);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        locations.push_back(rowToLocation(stmt));
+    }
+    sqlite3_finalize(stmt);
+    return locations;
+}
+
+int LocationStore::getUnsyncedCount() {
+    if (!db_) return 0;
+
+    const char* sql = "SELECT COUNT(*) FROM locations WHERE synced = 0;";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) return 0;
+
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return count;
+}
+
+bool LocationStore::markSynced(const std::vector<int64_t>& ids) {
+    if (!db_ || ids.empty()) return false;
+
+    char* errMsg = nullptr;
+    sqlite3_exec(db_, "BEGIN TRANSACTION;", nullptr, nullptr, &errMsg);
+    if (errMsg) { sqlite3_free(errMsg); return false; }
+
+    const char* sql = "UPDATE locations SET synced = 1 WHERE id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+
+    for (int64_t id : ids) {
+        sqlite3_reset(stmt);
+        sqlite3_bind_int64(stmt, 1, id);
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            sqlite3_finalize(stmt);
+            sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+            return false;
+        }
+    }
+    sqlite3_finalize(stmt);
+
+    sqlite3_exec(db_, "COMMIT;", nullptr, nullptr, &errMsg);
+    if (errMsg) {
+        sqlite3_free(errMsg);
+        return false;
+    }
+    return true;
+}
+
 Location LocationStore::rowToLocation(sqlite3_stmt* stmt) {
     Location loc;
     loc.id = sqlite3_column_int64(stmt, 0);

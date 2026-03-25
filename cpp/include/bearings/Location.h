@@ -30,6 +30,8 @@ struct Location {
     static Location fromJson(const std::string& json);
     std::string toJson() const;
     static std::string toJsonArray(const std::vector<Location>& locations);
+    std::string toSyncJson() const;
+    static std::string toSyncJsonArray(const std::vector<Location>& locations);
 
     /// Haversine distance in meters to another location.
     double distanceTo(const Location& other) const;

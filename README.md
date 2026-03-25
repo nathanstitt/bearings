@@ -7,6 +7,7 @@ Built as a [Turbo Module](https://reactnative.dev/docs/the-new-architecture/pill
 ## Features
 
 - Background location tracking with configurable accuracy and distance filters
+- Offline-aware HTTP sync with batching, exponential backoff, and priority geofence sync
 - Geofencing with ENTER, EXIT, and DWELL events
 - Schedule-based tracking windows
 - SQLite-backed persistent location storage
@@ -49,6 +50,9 @@ await configure({
   stopOnTerminate: false,
   startOnBoot: true,
   debug: false,
+  url: 'https://my-server.com/locations',
+  syncThreshold: 5,
+  maxBatchSize: 100,
 });
 
 // Subscribe to location updates
@@ -136,6 +140,52 @@ geofenceSub.remove();
 
 All event subscribers return a `Subscription` with a `remove()` method.
 
+### HTTP Sync
+
+When a `url` is configured, Bearings automatically POSTs stored locations to your server. Sync is offline-aware — locations accumulate in SQLite while offline and flush when connectivity is restored.
+
+**Behavior:**
+- Sync triggers when unsynced location count reaches `syncThreshold`.
+- Geofence ENTER/EXIT events trigger an immediate sync regardless of threshold.
+- On HTTP failure, the device is treated as offline and retries with exponential backoff (base `syncRetryBaseSeconds`, capped at 300s).
+- When connectivity is restored, the backoff resets and pending locations sync immediately.
+- Locations are never marked as synced until the server responds with success.
+- Only one sync request is in flight at a time; remaining locations flush in subsequent batches.
+
+**POST payload format:**
+```json
+{
+  "location": [
+    {
+      "uuid": "...",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "latitude": 40.7128,
+      "longitude": -74.006,
+      "altitude": 10.0,
+      "speed": 1.5,
+      "heading": 180.0,
+      "accuracy": 5.0,
+      "speed_accuracy": 1.0,
+      "heading_accuracy": 10.0,
+      "altitude_accuracy": 3.0,
+      "is_moving": true,
+      "activity": { "type": "walking", "confidence": 85 },
+      "event": "",
+      "extras": ""
+    }
+  ]
+}
+```
+
+The `getState()` response includes a `sync` object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sync.enabled` | `boolean` | `true` when `url` is configured. |
+| `sync.connected` | `boolean` | Current connectivity status. |
+| `sync.syncInFlight` | `boolean` | Whether a sync request is currently in progress. |
+| `sync.unsyncedCount` | `number` | Number of locations awaiting sync. |
+
 ### Config
 
 | Option | Type | Default | Description |
@@ -147,7 +197,10 @@ All event subscribers return a `Subscription` with a `remove()` method.
 | `debug` | `boolean` | `false` | Enable debug logging and sound effects. |
 | `stopOnTerminate` | `boolean` | `true` | Stop tracking when the app is terminated. |
 | `startOnBoot` | `boolean` | `false` | Resume tracking after device reboot. |
-| `url` | `string` | `''` | URL for automatic location sync. |
+| `url` | `string` | `''` | URL for automatic location sync (POST endpoint). |
+| `syncThreshold` | `number` | `5` | Number of unsynced locations before a sync is triggered. |
+| `maxBatchSize` | `number` | `100` | Maximum locations per HTTP POST request. |
+| `syncRetryBaseSeconds` | `number` | `10` | Base delay (seconds) for exponential backoff on sync failure. |
 | `schedule` | `string[]` | — | Schedule windows for time-based tracking. |
 | `scheduleUseAlarmManager` | `boolean` | — | Use AlarmManager for schedule triggers (Android). |
 
@@ -170,7 +223,7 @@ All event subscribers return a `Subscription` with a `remove()` method.
 └─────────────────┴───────────────────────────┘
 ```
 
-- **C++ core** (`cpp/`) — Platform-agnostic business logic: state machine (UNKNOWN -> MOVING <-> STATIONARY), SQLite location storage, config management, geofence tracking, and scheduling.
+- **C++ core** (`cpp/`) — Platform-agnostic business logic: state machine (UNKNOWN -> MOVING <-> STATIONARY), SQLite location storage, config management, geofence tracking, scheduling, and offline-aware HTTP sync orchestration.
 - **iOS bridge** (`ios/`) — `CLLocationManager`-based location delegate, Turbo Module entry point.
 - **Android bridge** (`android/`) — `FusedLocationProviderClient`, foreground service for background tracking, JNI layer to C++ core.
 - **TypeScript layer** (`src/`) — Thin wrapper over the Turbo Module. All native methods exchange JSON strings across the JS-Native boundary.

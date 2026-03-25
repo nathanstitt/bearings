@@ -14,6 +14,9 @@ struct Config {
     bool stopOnTerminate = true;
     bool startOnBoot = false;
     std::string url;
+    int syncThreshold = 5;
+    int maxBatchSize = 100;
+    int syncRetryBaseSeconds = 10;
     bool enabled = false;
     std::vector<std::string> schedule;
     bool scheduleUseAlarmManager = false;

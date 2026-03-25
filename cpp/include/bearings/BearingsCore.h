@@ -56,6 +56,11 @@ public:
     void onScheduleTimerFired(int year, int month, int day, int dayOfWeek,
                               int hour, int minute, int second);
 
+    // Sync callbacks from platform layer
+    void onSyncComplete(int requestId, bool success);
+    void onSyncRetryTimerFired();
+    void onConnectivityChange(bool connected);
+
     // Callbacks from platform layer
     void onMotionDetected(int activityType, int confidence);
     void onStopTimerFired();
@@ -66,6 +71,9 @@ private:
     void transitionToStationary();
     void dispatchMotionChange();
     void dispatchActivityChange();
+    void maybeSync();
+    void performSync();
+    bool isSyncEnabled() const;
 
     std::shared_ptr<PlatformBridge> bridge_;
     Config config_;
@@ -87,6 +95,14 @@ private:
     Schedule schedule_;
     bool schedulerRunning_ = false;
     bool schedulerTracking_ = false;
+
+    bool connected_ = true;
+    bool syncInFlight_ = false;
+    int nextRequestId_ = 1;
+    int activeRequestId_ = 0;
+    std::vector<int64_t> pendingSyncIds_;
+    int syncRetryCount_ = 0;
+    bool syncRetryTimerRunning_ = false;
 };
 
 } // namespace bearings

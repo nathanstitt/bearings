@@ -130,6 +130,17 @@ void BearingsCore::stop() {
         bridge_->stopStationaryGeofence();
     }
 
+    // Clean up sync state
+    if (syncRetryTimerRunning_) {
+        bridge_->cancelSyncRetryTimer();
+        syncRetryTimerRunning_ = false;
+    }
+    syncInFlight_ = false;
+    activeRequestId_ = 0;
+    pendingSyncIds_.clear();
+    syncRetryCount_ = 0;
+    connected_ = true;
+
     tracking_ = false;
     config_.enabled = false;
     schedulerTracking_ = false;
@@ -151,6 +162,12 @@ std::string BearingsCore::getState() {
         {"activity", {
             {"type", activityTypeToString(currentActivity_)},
             {"confidence", currentActivityConfidence_},
+        }},
+        {"sync", {
+            {"enabled", isSyncEnabled()},
+            {"connected", connected_},
+            {"syncInFlight", syncInFlight_},
+            {"unsyncedCount", configured_ ? store_.getUnsyncedCount() : 0},
         }},
         {"config", json::parse(config_.toJson())},
     };
@@ -249,6 +266,8 @@ void BearingsCore::onGeofenceEvent(const std::string& identifier, const std::str
 
     bridge_->dispatchEvent("geofence", j.dump());
     Logger::instance().info("Geofence event: " + action + " for " + identifier);
+
+    maybeSync();
 }
 
 void BearingsCore::onLocationReceived(const Location& location) {
@@ -287,6 +306,10 @@ void BearingsCore::onLocationReceived(const Location& location) {
     Logger::instance().debug("Location dispatched: " +
         std::to_string(loc.latitude) + ", " +
         std::to_string(loc.longitude));
+
+    if (isSyncEnabled() && store_.getUnsyncedCount() >= config_.syncThreshold) {
+        maybeSync();
+    }
 }
 
 void BearingsCore::onMotionDetected(int activityTypeInt, int confidence) {
@@ -453,6 +476,89 @@ void BearingsCore::onScheduleTimerFired(int year, int month, int day, int dayOfW
 
     Logger::instance().debug("Schedule: next evaluation in " + std::to_string(nextDelay) + "s");
     bridge_->startScheduleTimer(nextDelay);
+}
+
+// --- Sync ---
+
+bool BearingsCore::isSyncEnabled() const {
+    return !config_.url.empty();
+}
+
+void BearingsCore::maybeSync() {
+    if (!isSyncEnabled()) return;
+    if (!configured_) return;
+    if (syncInFlight_) return;
+    if (!connected_) return;
+
+    performSync();
+}
+
+void BearingsCore::performSync() {
+    auto unsynced = store_.getUnsynced(config_.maxBatchSize);
+    if (unsynced.empty()) return;
+
+    pendingSyncIds_.clear();
+    for (const auto& loc : unsynced) {
+        pendingSyncIds_.push_back(loc.id);
+    }
+
+    json payload = {{"location", json::parse(Location::toSyncJsonArray(unsynced))}};
+
+    activeRequestId_ = nextRequestId_++;
+    syncInFlight_ = true;
+    bridge_->sendHTTPRequest(config_.url, payload.dump(), activeRequestId_);
+}
+
+void BearingsCore::onSyncComplete(int requestId, bool success) {
+    if (requestId != activeRequestId_) return;
+
+    syncInFlight_ = false;
+
+    if (success) {
+        store_.markSynced(pendingSyncIds_);
+        int syncedCount = static_cast<int>(pendingSyncIds_.size());
+        pendingSyncIds_.clear();
+        syncRetryCount_ = 0;
+
+        json ev = {{"success", true}, {"count", syncedCount}};
+        bridge_->dispatchEvent("sync", ev.dump());
+
+        maybeSync();
+    } else {
+        connected_ = false;
+        syncRetryCount_++;
+
+        int delay = config_.syncRetryBaseSeconds;
+        for (int i = 1; i < syncRetryCount_; i++) {
+            delay *= 2;
+            if (delay >= 300) { delay = 300; break; }
+        }
+
+        syncRetryTimerRunning_ = true;
+        bridge_->startSyncRetryTimer(delay);
+
+        json ev = {{"success", false}};
+        bridge_->dispatchEvent("sync", ev.dump());
+    }
+}
+
+void BearingsCore::onSyncRetryTimerFired() {
+    syncRetryTimerRunning_ = false;
+    connected_ = true;
+    maybeSync();
+}
+
+void BearingsCore::onConnectivityChange(bool connected) {
+    connected_ = connected;
+
+    if (connected) {
+        syncRetryCount_ = 0;
+        if (syncRetryTimerRunning_) {
+            bridge_->cancelSyncRetryTimer();
+            syncRetryTimerRunning_ = false;
+        }
+        maybeSync();
+    }
 }
 
 } // namespace bearings
