@@ -1,4 +1,4 @@
-package com.bearings
+package com.geomony
 
 import android.Manifest
 import android.app.AlarmManager
@@ -16,9 +16,9 @@ import com.google.android.gms.location.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-class BearingsLocationService(
+class GeomonyLocationService(
     private val context: Context,
-    private val bridge: BearingsPlatformBridge
+    private val bridge: GeomonyPlatformBridge
 ) {
     private val fusedClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
@@ -114,7 +114,7 @@ class BearingsLocationService(
         )
 
         val request = ActivityTransitionRequest(transitions)
-        val intent = Intent(context, BearingsActivityReceiver::class.java)
+        val intent = Intent(context, GeomonyActivityReceiver::class.java)
         activityPendingIntent = PendingIntent.getBroadcast(
             context, 100, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -138,7 +138,7 @@ class BearingsLocationService(
         }
 
         val geofence = Geofence.Builder()
-            .setRequestId("__bearings_stationary")
+            .setRequestId("__geomony_stationary")
             .setCircularRegion(lat, lon, radius.toFloat())
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_EXIT)
@@ -149,7 +149,7 @@ class BearingsLocationService(
             .addGeofence(geofence)
             .build()
 
-        val intent = Intent(context, BearingsGeofenceReceiver::class.java)
+        val intent = Intent(context, GeomonyGeofenceReceiver::class.java)
         geofencePendingIntent = PendingIntent.getBroadcast(
             context, 101, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -169,7 +169,7 @@ class BearingsLocationService(
 
     private fun getUserGeofencePendingIntent(): PendingIntent {
         if (userGeofencePendingIntent == null) {
-            val intent = Intent(context, BearingsGeofenceReceiver::class.java)
+            val intent = Intent(context, GeomonyGeofenceReceiver::class.java)
             userGeofencePendingIntent = PendingIntent.getBroadcast(
                 context, 102, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -251,7 +251,7 @@ class BearingsLocationService(
             return
         }
 
-        val intent = Intent(context, BearingsScheduleReceiver::class.java)
+        val intent = Intent(context, GeomonyScheduleReceiver::class.java)
         schedulePendingIntent = PendingIntent.getBroadcast(
             context, 103, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -295,6 +295,56 @@ class BearingsLocationService(
             calendar.get(Calendar.SECOND)
         )
     }
+
+    // --- Sync ---
+
+    private var syncRetryRunnable: Runnable? = null
+
+    fun sendHTTPRequest(url: String, jsonPayload: String, requestId: Int) {
+        Thread {
+            var success = false
+            try {
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.doOutput = true
+                connection.connectTimeout = 30_000
+                connection.readTimeout = 30_000
+
+                connection.outputStream.use { os ->
+                    os.write(jsonPayload.toByteArray(Charsets.UTF_8))
+                }
+
+                val responseCode = connection.responseCode
+                success = responseCode in 200..299
+                connection.disconnect()
+            } catch (_: Exception) {
+                success = false
+            }
+            val result = success
+            mainHandler.post {
+                bridge.notifySyncComplete(requestId, result)
+            }
+        }.start()
+    }
+
+    fun startSyncRetryTimer(delaySeconds: Int) {
+        cancelSyncRetryTimer()
+        syncRetryRunnable = Runnable {
+            bridge.notifySyncRetryTimerFired()
+            syncRetryRunnable = null
+        }
+        mainHandler.postDelayed(syncRetryRunnable!!, delaySeconds * 1000L)
+    }
+
+    fun cancelSyncRetryTimer() {
+        syncRetryRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            syncRetryRunnable = null
+        }
+    }
+
+    // --- Location received ---
 
     private fun onLocationReceived(location: Location) {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)

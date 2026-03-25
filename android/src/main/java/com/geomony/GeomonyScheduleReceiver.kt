@@ -1,11 +1,11 @@
-package com.bearings
+package com.geomony
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
-class BearingsScheduleReceiver : BroadcastReceiver() {
+class GeomonyScheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        BearingsPlatformBridge.instance?.locationService?.evaluateScheduleNow()
+        GeomonyPlatformBridge.instance?.locationService?.evaluateScheduleNow()
     }
 }

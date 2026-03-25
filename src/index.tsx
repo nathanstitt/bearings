@@ -1,5 +1,5 @@
 import { NativeEventEmitter } from 'react-native';
-import NativeBearings from './NativeBearings';
+import NativeGeomony from './NativeGeomony';
 import type {
   ActivityChangeEvent,
   Config,
@@ -26,57 +26,57 @@ export type {
   Subscription,
 } from './types';
 
-const emitter = new NativeEventEmitter(NativeBearings);
+const emitter = new NativeEventEmitter(NativeGeomony);
 
 export async function configure(config: Partial<Config>): Promise<State> {
   const json = JSON.stringify(config);
-  const result = await NativeBearings.configure(json);
+  const result = await NativeGeomony.configure(json);
   return JSON.parse(result) as State;
 }
 
 export async function start(): Promise<State> {
-  const result = await NativeBearings.start();
+  const result = await NativeGeomony.start();
   return JSON.parse(result) as State;
 }
 
 export async function stop(): Promise<State> {
-  const result = await NativeBearings.stop();
+  const result = await NativeGeomony.stop();
   return JSON.parse(result) as State;
 }
 
 export async function getState(): Promise<State> {
-  const result = await NativeBearings.getState();
+  const result = await NativeGeomony.getState();
   return JSON.parse(result) as State;
 }
 
 export async function getLocations(): Promise<Location[]> {
-  const result = await NativeBearings.getLocations();
+  const result = await NativeGeomony.getLocations();
   return JSON.parse(result) as Location[];
 }
 
 export async function getCount(): Promise<number> {
-  return NativeBearings.getCount();
+  return NativeGeomony.getCount();
 }
 
 export async function destroyLocations(): Promise<boolean> {
-  return NativeBearings.destroyLocations();
+  return NativeGeomony.destroyLocations();
 }
 
 export async function addGeofence(geofence: Geofence): Promise<boolean> {
   const json = JSON.stringify(geofence);
-  return NativeBearings.addGeofence(json);
+  return NativeGeomony.addGeofence(json);
 }
 
 export async function removeGeofence(identifier: string): Promise<boolean> {
-  return NativeBearings.removeGeofence(identifier);
+  return NativeGeomony.removeGeofence(identifier);
 }
 
 export async function removeGeofences(): Promise<boolean> {
-  return NativeBearings.removeGeofences();
+  return NativeGeomony.removeGeofences();
 }
 
 export async function getGeofences(): Promise<Geofence[]> {
-  const result = await NativeBearings.getGeofences();
+  const result = await NativeGeomony.getGeofences();
   return JSON.parse(result) as Geofence[];
 }
 
@@ -107,12 +107,12 @@ export function onLocation(
 }
 
 export async function startSchedule(): Promise<State> {
-  const result = await NativeBearings.startSchedule();
+  const result = await NativeGeomony.startSchedule();
   return JSON.parse(result) as State;
 }
 
 export async function stopSchedule(): Promise<State> {
-  const result = await NativeBearings.stopSchedule();
+  const result = await NativeGeomony.stopSchedule();
   return JSON.parse(result) as State;
 }
 

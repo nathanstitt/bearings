@@ -1,4 +1,4 @@
-package com.bearings
+package com.geomony
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -6,7 +6,7 @@ import android.content.Intent
 import com.google.android.gms.location.ActivityTransitionResult
 import com.google.android.gms.location.DetectedActivity
 
-class BearingsActivityReceiver : BroadcastReceiver() {
+class GeomonyActivityReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!ActivityTransitionResult.hasResult(intent)) return
         val result = ActivityTransitionResult.extractResult(intent) ?: return
@@ -22,7 +22,7 @@ class BearingsActivityReceiver : BroadcastReceiver() {
                 else -> continue
             }
             // Activity transitions are high-confidence events
-            BearingsPlatformBridge.instance?.notifyMotionDetected(activityType, 100)
+            GeomonyPlatformBridge.instance?.notifyMotionDetected(activityType, 100)
         }
     }
 }

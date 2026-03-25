@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "bearings": ["./src/index"]
+      "geomony": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

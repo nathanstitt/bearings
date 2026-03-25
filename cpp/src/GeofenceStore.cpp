@@ -1,8 +1,8 @@
-#include "bearings/GeofenceStore.h"
-#include "bearings/Logger.h"
+#include "geomony/GeofenceStore.h"
+#include "geomony/Logger.h"
 #include "sqlite3.h"
 
-namespace bearings {
+namespace geomony {
 
 GeofenceStore::GeofenceStore() = default;
 
@@ -189,4 +189,4 @@ Geofence GeofenceStore::rowToGeofence(sqlite3_stmt* stmt) {
     return g;
 }
 
-} // namespace bearings
+} // namespace geomony

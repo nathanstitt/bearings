@@ -3,7 +3,7 @@
 #include <string>
 #include <functional>
 
-namespace bearings {
+namespace geomony {
 
 enum class LogLevel {
     Debug,
@@ -34,4 +34,4 @@ private:
     LogLevel minLevel_ = LogLevel::Info;
 };
 
-} // namespace bearings
+} // namespace geomony

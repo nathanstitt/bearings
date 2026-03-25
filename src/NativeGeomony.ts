@@ -19,4 +19,4 @@ export interface Spec extends TurboModule {
   removeListeners(count: number): void;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('Bearings');
+export default TurboModuleRegistry.getEnforcing<Spec>('Geomony');

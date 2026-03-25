@@ -11,7 +11,7 @@
 #include <memory>
 #include <string>
 
-namespace bearings {
+namespace geomony {
 
 enum class MotionState { UNKNOWN, MOVING, STATIONARY };
 
@@ -28,10 +28,10 @@ bool isMovingForActivity(ActivityType type);
 std::string activityTypeToString(ActivityType type);
 ActivityType activityTypeFromInt(int type);
 
-class BearingsCore {
+class GeomonyCore {
 public:
-    explicit BearingsCore(std::shared_ptr<PlatformBridge> bridge);
-    ~BearingsCore();
+    explicit GeomonyCore(std::shared_ptr<PlatformBridge> bridge);
+    ~GeomonyCore();
 
     void configure(const std::string& configJson);
     void start();
@@ -65,6 +65,9 @@ public:
     void onMotionDetected(int activityType, int confidence);
     void onStopTimerFired();
     void onGeofenceExit();
+
+    bool getStopOnTerminate() const;
+    void onTerminate();
 
 private:
     void transitionToMoving();
@@ -103,6 +106,7 @@ private:
     std::vector<int64_t> pendingSyncIds_;
     int syncRetryCount_ = 0;
     bool syncRetryTimerRunning_ = false;
+    bool terminated_ = false;
 };
 
-} // namespace bearings
+} // namespace geomony

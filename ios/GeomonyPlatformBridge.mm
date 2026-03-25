@@ -1,13 +1,13 @@
-#import "BearingsPlatformBridge.h"
-#import "Bearings.h"
-#import "BearingsLocationDelegate.h"
+#import "GeomonyPlatformBridge.h"
+#import "Geomony.h"
+#import "GeomonyLocationDelegate.h"
 
-BearingsPlatformBridgeImpl::BearingsPlatformBridgeImpl(Bearings* module)
+GeomonyPlatformBridgeImpl::GeomonyPlatformBridgeImpl(Geomony* module)
     : module_(module) {
 }
 
-void BearingsPlatformBridgeImpl::startLocationUpdates(double desiredAccuracy, double distanceFilter) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::startLocationUpdates(double desiredAccuracy, double distanceFilter) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -15,8 +15,8 @@ void BearingsPlatformBridgeImpl::startLocationUpdates(double desiredAccuracy, do
     });
 }
 
-void BearingsPlatformBridgeImpl::stopLocationUpdates() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::stopLocationUpdates() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -24,8 +24,8 @@ void BearingsPlatformBridgeImpl::stopLocationUpdates() {
     });
 }
 
-void BearingsPlatformBridgeImpl::dispatchEvent(const std::string& name, const std::string& json) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::dispatchEvent(const std::string& name, const std::string& json) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     NSString* eventName = [NSString stringWithUTF8String:name.c_str()];
@@ -36,15 +36,15 @@ void BearingsPlatformBridgeImpl::dispatchEvent(const std::string& name, const st
     });
 }
 
-std::string BearingsPlatformBridgeImpl::getDatabasePath() {
+std::string GeomonyPlatformBridgeImpl::getDatabasePath() {
     NSArray* paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString* documentsDir = [paths firstObject];
-    NSString* dbPath = [documentsDir stringByAppendingPathComponent:@"bearings.db"];
+    NSString* dbPath = [documentsDir stringByAppendingPathComponent:@"geomony.db"];
     return [dbPath UTF8String];
 }
 
-void BearingsPlatformBridgeImpl::startMotionActivity() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::startMotionActivity() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -52,8 +52,8 @@ void BearingsPlatformBridgeImpl::startMotionActivity() {
     });
 }
 
-void BearingsPlatformBridgeImpl::stopMotionActivity() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::stopMotionActivity() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -61,8 +61,8 @@ void BearingsPlatformBridgeImpl::stopMotionActivity() {
     });
 }
 
-void BearingsPlatformBridgeImpl::startStationaryGeofence(double lat, double lon, double radius) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::startStationaryGeofence(double lat, double lon, double radius) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -70,8 +70,8 @@ void BearingsPlatformBridgeImpl::startStationaryGeofence(double lat, double lon,
     });
 }
 
-void BearingsPlatformBridgeImpl::stopStationaryGeofence() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::stopStationaryGeofence() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -79,8 +79,8 @@ void BearingsPlatformBridgeImpl::stopStationaryGeofence() {
     });
 }
 
-void BearingsPlatformBridgeImpl::startStopTimer(int seconds) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::startStopTimer(int seconds) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -88,8 +88,8 @@ void BearingsPlatformBridgeImpl::startStopTimer(int seconds) {
     });
 }
 
-void BearingsPlatformBridgeImpl::cancelStopTimer() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::cancelStopTimer() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -97,10 +97,10 @@ void BearingsPlatformBridgeImpl::cancelStopTimer() {
     });
 }
 
-void BearingsPlatformBridgeImpl::addGeofence(const std::string& identifier, double lat, double lon,
+void GeomonyPlatformBridgeImpl::addGeofence(const std::string& identifier, double lat, double lon,
     double radius, bool notifyOnEntry, bool notifyOnExit,
     bool notifyOnDwell, int loiteringDelay) {
-    Bearings* mod = module_;
+    Geomony* mod = module_;
     if (!mod) return;
 
     NSString* nsId = [NSString stringWithUTF8String:identifier.c_str()];
@@ -116,8 +116,8 @@ void BearingsPlatformBridgeImpl::addGeofence(const std::string& identifier, doub
     });
 }
 
-void BearingsPlatformBridgeImpl::removeGeofence(const std::string& identifier) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::removeGeofence(const std::string& identifier) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     NSString* nsId = [NSString stringWithUTF8String:identifier.c_str()];
@@ -126,8 +126,8 @@ void BearingsPlatformBridgeImpl::removeGeofence(const std::string& identifier) {
     });
 }
 
-void BearingsPlatformBridgeImpl::removeAllGeofences() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::removeAllGeofences() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -135,8 +135,8 @@ void BearingsPlatformBridgeImpl::removeAllGeofences() {
     });
 }
 
-void BearingsPlatformBridgeImpl::startScheduleTimer(int delaySeconds) {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::startScheduleTimer(int delaySeconds) {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -144,11 +144,44 @@ void BearingsPlatformBridgeImpl::startScheduleTimer(int delaySeconds) {
     });
 }
 
-void BearingsPlatformBridgeImpl::cancelScheduleTimer() {
-    Bearings* mod = module_;
+void GeomonyPlatformBridgeImpl::cancelScheduleTimer() {
+    Geomony* mod = module_;
     if (!mod) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [mod.locationDelegate cancelScheduleTimer];
+    });
+}
+
+void GeomonyPlatformBridgeImpl::sendHTTPRequest(const std::string& url,
+                                                  const std::string& jsonPayload,
+                                                  int requestId) {
+    Geomony* mod = module_;
+    if (!mod) return;
+
+    NSString* nsUrl = [NSString stringWithUTF8String:url.c_str()];
+    NSString* nsPayload = [NSString stringWithUTF8String:jsonPayload.c_str()];
+    int rid = requestId;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [mod.locationDelegate sendHTTPRequest:nsUrl payload:nsPayload requestId:rid];
+    });
+}
+
+void GeomonyPlatformBridgeImpl::startSyncRetryTimer(int delaySeconds) {
+    Geomony* mod = module_;
+    if (!mod) return;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [mod.locationDelegate startSyncRetryTimerWithSeconds:delaySeconds];
+    });
+}
+
+void GeomonyPlatformBridgeImpl::cancelSyncRetryTimer() {
+    Geomony* mod = module_;
+    if (!mod) return;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [mod.locationDelegate cancelSyncRetryTimer];
     });
 }

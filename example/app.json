@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Bearings Example",
-    "slug": "bearings-example",
+    "name": "Geomony Example",
+    "slug": "geomony-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bearings.example",
+      "bundleIdentifier": "com.geomony.example",
       "infoPlist": {
         "UIBackgroundModes": ["location"]
       }
@@ -25,7 +25,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.bearings.example"
+      "package": "com.geomony.example"
     },
     "web": {
       "favicon": "./assets/favicon.png"

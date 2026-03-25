@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace bearings {
+namespace geomony {
 
 struct Geofence {
     std::string identifier;
@@ -21,4 +21,4 @@ struct Geofence {
     static std::string toJsonArray(const std::vector<Geofence>& geofences);
 };
 
-} // namespace bearings
+} // namespace geomony

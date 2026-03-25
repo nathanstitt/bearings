@@ -1,8 +1,8 @@
-#include "bearings/LocationStore.h"
-#include "bearings/Logger.h"
+#include "geomony/LocationStore.h"
+#include "geomony/Logger.h"
 #include "sqlite3.h"
 
-namespace bearings {
+namespace geomony {
 
 LocationStore::LocationStore() = default;
 
@@ -281,4 +281,4 @@ Location LocationStore::rowToLocation(sqlite3_stmt* stmt) {
     return loc;
 }
 
-} // namespace bearings
+} // namespace geomony

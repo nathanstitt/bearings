@@ -10,12 +10,12 @@
 
     <application>
         <service
-            android:name=".BearingsForegroundService"
+            android:name=".GeomonyForegroundService"
             android:foregroundServiceType="location"
             android:exported="false" />
 
-        <receiver android:name=".BearingsActivityReceiver" android:exported="false" />
-        <receiver android:name=".BearingsGeofenceReceiver" android:exported="false" />
-        <receiver android:name=".BearingsScheduleReceiver" android:exported="false" />
+        <receiver android:name=".GeomonyActivityReceiver" android:exported="false" />
+        <receiver android:name=".GeomonyGeofenceReceiver" android:exported="false" />
+        <receiver android:name=".GeomonyScheduleReceiver" android:exported="false" />
     </application>
 </manifest>

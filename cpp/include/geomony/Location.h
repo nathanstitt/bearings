@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace bearings {
+namespace geomony {
 
 struct Location {
     int64_t id = 0;
@@ -37,4 +37,4 @@ struct Location {
     double distanceTo(const Location& other) const;
 };
 
-} // namespace bearings
+} // namespace geomony

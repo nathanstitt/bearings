@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Config } from 'bearings';
+import type { Config } from 'geomony';
 import { DEFAULT_CONFIG } from './config';
 
-const STORAGE_KEY = '@bearings/settings';
+const STORAGE_KEY = '@geomony/settings';
 
 export async function loadSettings(): Promise<Partial<Config>> {
   try {

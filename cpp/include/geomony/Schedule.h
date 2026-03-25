@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace bearings {
+namespace geomony {
 
 struct ScheduleRule {
     std::vector<int> days;           // 1=Sun..7=Sat (empty for literal dates)
@@ -31,4 +31,4 @@ private:
     std::vector<ScheduleRule> rules_;
 };
 
-} // namespace bearings
+} // namespace geomony

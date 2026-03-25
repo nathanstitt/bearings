@@ -1,9 +1,9 @@
-#include "bearings/Config.h"
+#include "geomony/Config.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-namespace bearings {
+namespace geomony {
 
 Config Config::fromJson(const std::string& jsonStr) {
     Config config;
@@ -51,4 +51,4 @@ std::string Config::toJson() const {
     return j.dump();
 }
 
-} // namespace bearings
+} // namespace geomony

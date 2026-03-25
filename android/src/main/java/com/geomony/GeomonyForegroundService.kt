@@ -1,4 +1,4 @@
-package com.bearings
+package com.geomony
 
 import android.app.*
 import android.content.Context
@@ -7,14 +7,14 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 
-class BearingsForegroundService : Service() {
+class GeomonyForegroundService : Service() {
 
     companion object {
-        private const val CHANNEL_ID = "bearings_location"
+        private const val CHANNEL_ID = "geomony_location"
         private const val NOTIFICATION_ID = 7799
 
         fun start(context: Context) {
-            val intent = Intent(context, BearingsForegroundService::class.java)
+            val intent = Intent(context, GeomonyForegroundService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -23,7 +23,7 @@ class BearingsForegroundService : Service() {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, BearingsForegroundService::class.java)
+            val intent = Intent(context, GeomonyForegroundService::class.java)
             context.stopService(intent)
         }
     }
@@ -33,6 +33,15 @@ class BearingsForegroundService : Service() {
         val notification = buildNotification()
         startForeground(NOTIFICATION_ID, notification)
         return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val bridge = GeomonyPlatformBridge.instance
+        if (bridge == null || bridge.getStopOnTerminate()) {
+            stopSelf()
+        }
+        // stopOnTerminate=false: do nothing — START_STICKY keeps service alive
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

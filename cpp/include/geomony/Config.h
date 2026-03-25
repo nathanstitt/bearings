@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace bearings {
+namespace geomony {
 
 struct Config {
     double desiredAccuracy = -1;   // -1 = best, -2 = 10m, -3 = 100m, etc.
@@ -26,4 +26,4 @@ struct Config {
     void merge(const std::string& json);
 };
 
-} // namespace bearings
+} // namespace geomony

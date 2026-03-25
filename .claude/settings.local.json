@@ -13,17 +13,17 @@
       "Bash(tee /private/tmp/claude/build.log)",
       "Bash(tee /private/tmp/claude/build3.log)",
       "WebFetch(domain:github.com)",
-      "Bash(xcodebuild -workspace /Users/nas/code/geotrack/example/ios/BearingsExample.xcworkspace -scheme BearingsExample -sdk iphonesimulator -configuration Debug build)",
+      "Bash(xcodebuild -workspace /Users/nas/code/geotrack/example/ios/GeomonyExample.xcworkspace -scheme GeomonyExample -sdk iphonesimulator -configuration Debug build)",
       "Bash(grep -v \"^$\")",
       "Bash(NODE_OPTIONS=\"--localstorage-file=$TMPDIR/node-localstorage\" npx jest --watchAll=false --no-watchman 2>&1)",
       "Bash(yarn test:*)",
       "Bash(npx jest:*)",
       "Bash(pod install:*)",
-      "Bash(xcodebuild -workspace example/ios/BearingsExample.xcworkspace -scheme BearingsExample -sdk iphonesimulator -configuration Debug build)",
+      "Bash(xcodebuild -workspace example/ios/GeomonyExample.xcworkspace -scheme GeomonyExample -sdk iphonesimulator -configuration Debug build)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "WebFetch(domain:registry.npmjs.org)",
-      "Bash(cpp/build/bearings_tests 2>&1)"
+      "Bash(cpp/build/geomony_tests 2>&1)"
     ]
   },
   "sandbox": {

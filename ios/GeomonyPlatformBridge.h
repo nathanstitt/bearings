@@ -2,14 +2,14 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreLocation/CoreLocation.h>
-#include "bearings/PlatformBridge.h"
+#include "geomony/PlatformBridge.h"
 #include <memory>
 
-@class Bearings;
+@class Geomony;
 
-class BearingsPlatformBridgeImpl : public bearings::PlatformBridge {
+class GeomonyPlatformBridgeImpl : public geomony::PlatformBridge {
 public:
-    BearingsPlatformBridgeImpl(Bearings* module);
+    GeomonyPlatformBridgeImpl(Geomony* module);
 
     void startLocationUpdates(double desiredAccuracy, double distanceFilter) override;
     void stopLocationUpdates() override;
@@ -32,6 +32,12 @@ public:
     void startScheduleTimer(int delaySeconds) override;
     void cancelScheduleTimer() override;
 
+    void sendHTTPRequest(const std::string& url,
+                         const std::string& jsonPayload,
+                         int requestId) override;
+    void startSyncRetryTimer(int delaySeconds) override;
+    void cancelSyncRetryTimer() override;
+
 private:
-    __weak Bearings* module_;
+    __weak Geomony* module_;
 };

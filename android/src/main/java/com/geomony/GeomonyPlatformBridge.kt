@@ -1,17 +1,17 @@
-package com.bearings
+package com.geomony
 
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import java.io.File
 
-class BearingsPlatformBridge(private val reactContext: ReactApplicationContext) {
+class GeomonyPlatformBridge(private val reactContext: ReactApplicationContext) {
     var nativePtr: Long = 0L
         private set
 
-    var locationService: BearingsLocationService? = null
+    var locationService: GeomonyLocationService? = null
 
     init {
-        System.loadLibrary("bearings_core")
+        System.loadLibrary("geomony_core")
         nativePtr = nativeCreate()
         instance = this
     }
@@ -106,6 +106,18 @@ class BearingsPlatformBridge(private val reactContext: ReactApplicationContext) 
         }
     }
 
+    fun notifySyncComplete(requestId: Int, success: Boolean) {
+        if (nativePtr != 0L) {
+            nativeOnSyncComplete(nativePtr, requestId, success)
+        }
+    }
+
+    fun notifySyncRetryTimerFired() {
+        if (nativePtr != 0L) {
+            nativeOnSyncRetryTimerFired(nativePtr)
+        }
+    }
+
     fun notifyScheduleTimerFired(year: Int, month: Int, day: Int, dayOfWeek: Int,
                                   hour: Int, minute: Int, second: Int) {
         if (nativePtr != 0L) {
@@ -153,11 +165,11 @@ class BearingsPlatformBridge(private val reactContext: ReactApplicationContext) 
 
     @Suppress("unused")
     fun onGetDatabasePath(): String {
-        val dbDir = reactContext.getDatabasePath("bearings")?.parentFile
+        val dbDir = reactContext.getDatabasePath("geomony")?.parentFile
         if (dbDir != null && !dbDir.exists()) {
             dbDir.mkdirs()
         }
-        return reactContext.getDatabasePath("bearings.db")?.absolutePath ?: ""
+        return reactContext.getDatabasePath("geomony.db")?.absolutePath ?: ""
     }
 
     @Suppress("unused")
@@ -220,6 +232,26 @@ class BearingsPlatformBridge(private val reactContext: ReactApplicationContext) 
         locationService?.cancelScheduleTimer()
     }
 
+    @Suppress("unused")
+    fun onSendHTTPRequest(url: String, jsonPayload: String, requestId: Int) {
+        locationService?.sendHTTPRequest(url, jsonPayload, requestId)
+    }
+
+    @Suppress("unused")
+    fun onStartSyncRetryTimer(delaySeconds: Int) {
+        locationService?.startSyncRetryTimer(delaySeconds)
+    }
+
+    @Suppress("unused")
+    fun onCancelSyncRetryTimer() {
+        locationService?.cancelSyncRetryTimer()
+    }
+
+    fun getStopOnTerminate(): Boolean {
+        if (nativePtr == 0L) return true
+        return nativeGetStopOnTerminate(nativePtr)
+    }
+
     // Native methods
     private external fun nativeCreate(): Long
     private external fun nativeDestroy(ptr: Long)
@@ -249,9 +281,12 @@ class BearingsPlatformBridge(private val reactContext: ReactApplicationContext) 
     private external fun nativeRemoveGeofence(ptr: Long, identifier: String): Boolean
     private external fun nativeRemoveAllGeofences(ptr: Long): Boolean
     private external fun nativeGetGeofences(ptr: Long): String
+    private external fun nativeGetStopOnTerminate(ptr: Long): Boolean
+    private external fun nativeOnSyncComplete(ptr: Long, requestId: Int, success: Boolean)
+    private external fun nativeOnSyncRetryTimerFired(ptr: Long)
 
     companion object {
-        var instance: BearingsPlatformBridge? = null
+        var instance: GeomonyPlatformBridge? = null
             private set
     }
 }

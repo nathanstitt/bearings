@@ -29,7 +29,7 @@ import {
   type Geofence,
   type GeofenceEvent,
   type ScheduleEvent,
-} from 'bearings';
+} from 'geomony';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import AddGeofenceScreen from './screens/AddGeofenceScreen';
@@ -40,7 +40,7 @@ import { haversineDistance } from './lib/geo';
 
 // --- Context ---
 
-interface BearingsContextValue {
+interface GeomonyContextValue {
   tracking: boolean;
   isMoving: boolean;
   schedulerRunning: boolean;
@@ -61,12 +61,12 @@ interface BearingsContextValue {
   removeAllGeofences: () => Promise<void>;
 }
 
-const BearingsContext = createContext<BearingsContextValue | null>(null);
+const GeomonyContext = createContext<GeomonyContextValue | null>(null);
 
-export function useBearings(): BearingsContextValue {
-  const ctx = useContext(BearingsContext);
+export function useGeomony(): GeomonyContextValue {
+  const ctx = useContext(GeomonyContext);
   if (!ctx) {
-    throw new Error('useBearings must be used within a BearingsProvider');
+    throw new Error('useGeomony must be used within a GeomonyProvider');
   }
   return ctx;
 }
@@ -75,7 +75,7 @@ export function useBearings(): BearingsContextValue {
 
 const MAX_LOCATIONS = 1000;
 
-function BearingsProvider({ children }: { children: ReactNode }) {
+function GeomonyProvider({ children }: { children: ReactNode }) {
   const [tracking, setTracking] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -132,13 +132,13 @@ function BearingsProvider({ children }: { children: ReactNode }) {
     const motionSub = onMotionChange((event) => {
       setIsMoving(event.isMoving);
       console.log(
-        `[Bearings] Motion change: ${event.isMoving ? 'MOVING' : 'STATIONARY'}`
+        `[Geomony] Motion change: ${event.isMoving ? 'MOVING' : 'STATIONARY'}`
       );
     });
 
     const geofenceSub = onGeofence((event) => {
       setGeofenceEvents((prev) => [event, ...prev].slice(0, 100));
-      console.log(`[Bearings] Geofence: ${event.action} ${event.identifier}`);
+      console.log(`[Geomony] Geofence: ${event.action} ${event.identifier}`);
     });
 
     const scheduleSub = onSchedule((event) => {
@@ -146,7 +146,7 @@ function BearingsProvider({ children }: { children: ReactNode }) {
       setTracking(event.enabled);
       setIsMoving(event.enabled);
       console.log(
-        `[Bearings] Schedule: tracking ${event.enabled ? 'started' : 'stopped'}`
+        `[Geomony] Schedule: tracking ${event.enabled ? 'started' : 'stopped'}`
       );
     });
 
@@ -214,7 +214,7 @@ function BearingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <BearingsContext.Provider
+    <GeomonyContext.Provider
       value={{
         tracking,
         isMoving,
@@ -237,7 +237,7 @@ function BearingsProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </BearingsContext.Provider>
+    </GeomonyContext.Provider>
   );
 }
 
@@ -252,7 +252,7 @@ type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function HeaderSwitch() {
-  const { tracking, startTracking, stopTracking } = useBearings();
+  const { tracking, startTracking, stopTracking } = useGeomony();
 
   return (
     <Switch
@@ -271,14 +271,14 @@ function HeaderSwitch() {
 
 export default function App() {
   return (
-    <BearingsProvider>
+    <GeomonyProvider>
       <NavigationContainer>
         <Stack.Navigator>
           <Stack.Screen
             name="Home"
             component={HomeScreen}
             options={{
-              title: 'Bearings',
+              title: 'Geomony',
               headerRight: HeaderSwitch,
             }}
           />
@@ -294,6 +294,6 @@ export default function App() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-    </BearingsProvider>
+    </GeomonyProvider>
   );
 }

@@ -4,13 +4,13 @@
 #import <CoreLocation/CoreLocation.h>
 #import <CoreMotion/CoreMotion.h>
 
-namespace bearings {
-    class BearingsCore;
+namespace geomony {
+    class GeomonyCore;
 }
 
-@interface BearingsLocationDelegate : NSObject <CLLocationManagerDelegate>
+@interface GeomonyLocationDelegate : NSObject <CLLocationManagerDelegate>
 
-@property (nonatomic, assign) bearings::BearingsCore* core;
+@property (nonatomic, assign) geomony::GeomonyCore* core;
 @property (nonatomic, strong) CLLocationManager* locationManager;
 @property (nonatomic, strong) CMMotionActivityManager* motionActivityManager;
 @property (nonatomic, strong) CLCircularRegion* stationaryRegion;
@@ -19,6 +19,7 @@ namespace bearings {
 @property (nonatomic, assign) BOOL schedulerActive;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, dispatch_source_t>* dwellTimers;
 @property (nonatomic, strong) NSMutableDictionary<NSString*, NSDictionary*>* geofenceConfigs;
+@property (nonatomic, assign) dispatch_source_t syncRetryTimer;
 
 - (void)startWithDesiredAccuracy:(double)desiredAccuracy distanceFilter:(double)distanceFilter;
 - (void)stop;
@@ -43,5 +44,9 @@ namespace bearings {
 - (void)startScheduleTimerWithSeconds:(int)seconds;
 - (void)cancelScheduleTimer;
 - (void)evaluateScheduleNow;
+
+- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload requestId:(int)requestId;
+- (void)startSyncRetryTimerWithSeconds:(int)seconds;
+- (void)cancelSyncRetryTimer;
 
 @end

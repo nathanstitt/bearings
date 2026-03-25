@@ -1,42 +1,47 @@
-#import "Bearings.h"
-#import "BearingsPlatformBridge.h"
-#import "BearingsLocationDelegate.h"
+#import "Geomony.h"
+#import "GeomonyPlatformBridge.h"
+#import "GeomonyLocationDelegate.h"
 
-#include "bearings/BearingsCore.h"
-#include "bearings/Logger.h"
+#include "geomony/GeomonyCore.h"
+#include "geomony/Logger.h"
 
 #include <memory>
 
-@implementation Bearings {
-    std::shared_ptr<bearings::BearingsCore> _core;
-    std::shared_ptr<BearingsPlatformBridgeImpl> _bridge;
+@implementation Geomony {
+    std::shared_ptr<geomony::GeomonyCore> _core;
+    std::shared_ptr<GeomonyPlatformBridgeImpl> _bridge;
     BOOL _hasListeners;
 }
 
 + (NSString *)moduleName {
-    return @"Bearings";
+    return @"Geomony";
 }
 
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _locationDelegate = [[BearingsLocationDelegate alloc] init];
-        _bridge = std::make_shared<BearingsPlatformBridgeImpl>(self);
-        _core = std::make_shared<bearings::BearingsCore>(_bridge);
+        _locationDelegate = [[GeomonyLocationDelegate alloc] init];
+        _bridge = std::make_shared<GeomonyPlatformBridgeImpl>(self);
+        _core = std::make_shared<geomony::GeomonyCore>(_bridge);
         _locationDelegate.core = _core.get();
 
-        bearings::Logger::instance().setHandler([](bearings::LogLevel level, const std::string& message) {
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationWillTerminate:)
+                                                     name:UIApplicationWillTerminateNotification
+                                                   object:nil];
+
+        geomony::Logger::instance().setHandler([](geomony::LogLevel level, const std::string& message) {
             NSString* msg = [NSString stringWithUTF8String:message.c_str()];
             switch (level) {
-                case bearings::LogLevel::Debug:
-                case bearings::LogLevel::Info:
-                    NSLog(@"[Bearings] %@", msg);
+                case geomony::LogLevel::Debug:
+                case geomony::LogLevel::Info:
+                    NSLog(@"[Geomony] %@", msg);
                     break;
-                case bearings::LogLevel::Warning:
-                    NSLog(@"[Bearings WARN] %@", msg);
+                case geomony::LogLevel::Warning:
+                    NSLog(@"[Geomony WARN] %@", msg);
                     break;
-                case bearings::LogLevel::Error:
-                    NSLog(@"[Bearings ERROR] %@", msg);
+                case geomony::LogLevel::Error:
+                    NSLog(@"[Geomony ERROR] %@", msg);
                     break;
             }
         });
@@ -44,12 +49,22 @@
     return self;
 }
 
-- (bearings::BearingsCore*)core {
+- (geomony::GeomonyCore*)core {
     return _core.get();
 }
 
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    if (_core) {
+        _core->onTerminate();
+    }
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (NSArray<NSString *> *)supportedEvents {
-    return @[@"location", @"motionchange", @"activitychange", @"geofence", @"schedule", @"error"];
+    return @[@"location", @"motionchange", @"activitychange", @"geofence", @"schedule", @"sync", @"error"];
 }
 
 - (void)startObserving {
@@ -69,6 +84,7 @@
            reject:(RCTPromiseRejectBlock)reject {
     std::string configStr = [config UTF8String];
     _core->configure(configStr);
+
     NSString* state = [NSString stringWithUTF8String:_core->getState().c_str()];
     resolve(state);
 }
@@ -164,7 +180,7 @@
 
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params {
-    return std::make_shared<facebook::react::NativeBearingsSpecJSI>(params);
+    return std::make_shared<facebook::react::NativeGeomonySpecJSI>(params);
 }
 
 @end

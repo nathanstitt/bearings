@@ -1,4 +1,4 @@
-# Bearings
+# Geomony
 
 Battery-conscious background location tracking & geofencing SDK for React Native.
 
@@ -17,7 +17,7 @@ Built as a [Turbo Module](https://reactnative.dev/docs/the-new-architecture/pill
 ## Installation
 
 ```sh
-yarn add bearings
+yarn add geomony
 ```
 
 ### iOS
@@ -41,7 +41,7 @@ import {
   onMotionChange,
   addGeofence,
   onGeofence,
-} from 'bearings';
+} from 'geomony';
 
 // Configure
 await configure({
@@ -142,7 +142,7 @@ All event subscribers return a `Subscription` with a `remove()` method.
 
 ### HTTP Sync
 
-When a `url` is configured, Bearings automatically POSTs stored locations to your server. Sync is offline-aware — locations accumulate in SQLite while offline and flush when connectivity is restored.
+When a `url` is configured, Geomony automatically POSTs stored locations to your server. Sync is offline-aware — locations accumulate in SQLite while offline and flush when connectivity is restored.
 
 **Behavior:**
 - Sync triggers when unsynced location count reaches `syncThreshold`.
@@ -195,7 +195,7 @@ The `getState()` response includes a `sync` object:
 | `stationaryRadius` | `number` | `25` | Radius (meters) for stationary detection. |
 | `stopTimeout` | `number` | `5` | Minutes without movement before entering STATIONARY. |
 | `debug` | `boolean` | `false` | Enable debug logging and sound effects. |
-| `stopOnTerminate` | `boolean` | `true` | Stop tracking when the app is terminated. |
+| `stopOnTerminate` | `boolean` | `true` | Stop tracking when the app is terminated (see below). |
 | `startOnBoot` | `boolean` | `false` | Resume tracking after device reboot. |
 | `url` | `string` | `''` | URL for automatic location sync (POST endpoint). |
 | `syncThreshold` | `number` | `5` | Number of unsynced locations before a sync is triggered. |
@@ -203,6 +203,62 @@ The `getState()` response includes a `sync` object:
 | `syncRetryBaseSeconds` | `number` | `10` | Base delay (seconds) for exponential backoff on sync failure. |
 | `schedule` | `string[]` | — | Schedule windows for time-based tracking. |
 | `scheduleUseAlarmManager` | `boolean` | — | Use AlarmManager for schedule triggers (Android). |
+
+### `stopOnTerminate`
+
+Controls what happens when the user swipes the app away or the OS terminates it.
+
+**`stopOnTerminate: true` (default)** — All tracking stops. Location updates, motion activity, geofences, timers, and sync are fully cleaned up.
+
+**`stopOnTerminate: false`** — Tracking survives app termination:
+
+- **iOS**: A stationary geofence is left at the last known position. When the user moves beyond it, iOS relaunches the app in the background. Your app must call `configure()` on every launch to reconnect the C++ core — the JS layer is responsible for restoring state.
+- **Android**: The foreground service continues running headlessly via `START_STICKY`. The `onTaskRemoved` handler keeps the service alive instead of calling `stopSelf()`.
+
+On termination with `stopOnTerminate: false`, timers and motion activity monitoring are cancelled (they won't survive process death), but the stationary geofence is preserved. If the device was in MOVING state, a new stationary geofence is placed at the last known position. If already STATIONARY, the existing geofence is left in place.
+
+## Battery
+
+Geomony is designed around minimizing GPS usage — the single largest battery drain in location tracking apps.
+
+### Motion state machine
+
+The core optimization. The device is always in one of two states:
+
+- **MOVING** — GPS is active, receiving location updates at the configured `distanceFilter`.
+- **STATIONARY** — GPS is completely off. A low-power geofence (`stationaryRadius`, default 25m) monitors for movement instead. Geofence monitoring uses cell/Wi-Fi radios and the motion coprocessor, consuming roughly 100x less power than GPS.
+
+Transitions are debounced by `stopTimeout` (default 5 minutes). When the motion activity sensor reports "still", a timer starts. If movement resumes before the timer fires, it's cancelled — this prevents rapid state oscillations at traffic lights or brief stops. Only after the full `stopTimeout` elapses does the device transition to STATIONARY and turn off GPS.
+
+### Motion activity detection
+
+Both platforms provide hardware-level activity classification (still, walking, running, cycling, driving) via dedicated low-power coprocessors (Apple M-series motion coprocessor, Android Activity Recognition API). These sensors run continuously at negligible power cost and drive the state machine without requiring GPS.
+
+Low-confidence readings are filtered out on iOS to avoid spurious state transitions.
+
+### Distance filter
+
+Locations closer than `distanceFilter` meters to the last dispatched location are silently dropped — they aren't stored, dispatched, or synced. This is measured from the last *dispatched* position, not the last *received* position, so the baseline only advances on meaningful movement. Reduces GPS wake-up processing by 50-90% in typical use.
+
+### Accuracy levels
+
+The `desiredAccuracy` config trades accuracy for power:
+
+| Value | iOS | Android | Power |
+|-------|-----|---------|-------|
+| `-1` | Best | `PRIORITY_HIGH_ACCURACY` | Highest (GPS) |
+| `-2` | 10m | `PRIORITY_BALANCED_POWER_ACCURACY` | Medium (GPS + network) |
+| `-3` | 100m | `PRIORITY_LOW_POWER` | Lowest (network/Wi-Fi only) |
+
+At `-3`, GPS hardware is never activated.
+
+### Schedule-based tracking
+
+When `schedule` rules are configured, tracking automatically starts and stops at defined time windows (e.g., weekday business hours only). Outside those windows, all location monitoring is completely off — no GPS, no geofences, no motion activity. The schedule timer fires only at transition boundaries, not on a poll interval.
+
+### Sync batching
+
+Locations accumulate in SQLite and are POSTed in batches of up to `maxBatchSize` when the unsynced count reaches `syncThreshold`. This amortizes the cost of radio wake-up — one request with 100 locations costs barely more battery than one request with 1. On sync failure, exponential backoff (10s base, 300s cap) prevents the radio from thrashing while offline. Locations are never lost; they sync when connectivity returns.
 
 ## Architecture
 

@@ -1,6 +1,6 @@
-#include "bearings/Logger.h"
+#include "geomony/Logger.h"
 
-namespace bearings {
+namespace geomony {
 
 Logger& Logger::instance() {
     static Logger logger;
@@ -38,4 +38,4 @@ void Logger::log(LogLevel level, const std::string& message) {
     }
 }
 
-} // namespace bearings
+} // namespace geomony

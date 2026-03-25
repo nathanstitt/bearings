@@ -1,18 +1,18 @@
-package com.bearings
+package com.geomony
 
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactMethod
 
-class BearingsModule(private val reactContext: ReactApplicationContext) :
-    NativeBearingsSpec(reactContext) {
+class GeomonyModule(private val reactContext: ReactApplicationContext) :
+    NativeGeomonySpec(reactContext) {
 
-    private var platformBridge: BearingsPlatformBridge? = null
+    private var platformBridge: GeomonyPlatformBridge? = null
 
-    private fun getBridge(): BearingsPlatformBridge {
+    private fun getBridge(): GeomonyPlatformBridge {
         if (platformBridge == null) {
-            platformBridge = BearingsPlatformBridge(reactContext).also { bridge ->
-                bridge.locationService = BearingsLocationService(reactContext, bridge)
+            platformBridge = GeomonyPlatformBridge(reactContext).also { bridge ->
+                bridge.locationService = GeomonyLocationService(reactContext, bridge)
             }
         }
         return platformBridge!!
@@ -24,18 +24,18 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
             bridge.configure(config)
             promise.resolve(bridge.getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
     override fun start(promise: Promise) {
         try {
             val bridge = getBridge()
-            BearingsForegroundService.start(reactContext)
+            GeomonyForegroundService.start(reactContext)
             bridge.start()
             promise.resolve(bridge.getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -43,10 +43,10 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             val bridge = getBridge()
             bridge.stop()
-            BearingsForegroundService.stop(reactContext)
+            GeomonyForegroundService.stop(reactContext)
             promise.resolve(bridge.getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -54,7 +54,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -62,7 +62,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().getLocations())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -70,7 +70,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().getCount().toDouble())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -78,7 +78,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().destroyLocations())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -86,7 +86,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().addGeofence(geofenceJson))
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -94,7 +94,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().removeGeofence(identifier))
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -102,7 +102,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().removeAllGeofences())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -110,7 +110,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
         try {
             promise.resolve(getBridge().getGeofences())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -120,7 +120,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
             bridge.startSchedule()
             promise.resolve(bridge.getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -130,7 +130,7 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
             bridge.stopSchedule()
             promise.resolve(bridge.getState())
         } catch (e: Exception) {
-            promise.reject("BEARINGS_ERROR", e.message, e)
+            promise.reject("GEOMONY_ERROR", e.message, e)
         }
     }
 
@@ -143,15 +143,18 @@ class BearingsModule(private val reactContext: ReactApplicationContext) :
     }
 
     override fun invalidate() {
-        platformBridge?.let {
-            it.locationService?.stop()
-            it.destroy()
+        platformBridge?.let { bridge ->
+            if (bridge.getStopOnTerminate()) {
+                bridge.locationService?.stop()
+                GeomonyForegroundService.stop(reactContext)
+                bridge.destroy()
+                platformBridge = null
+            }
         }
-        platformBridge = null
         super.invalidate()
     }
 
     companion object {
-        const val NAME = NativeBearingsSpec.NAME
+        const val NAME = NativeGeomonySpec.NAME
     }
 }

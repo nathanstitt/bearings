@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace bearings {
+namespace geomony {
 
 struct Config;
 
@@ -38,4 +38,4 @@ public:
     virtual void cancelSyncRetryTimer() = 0;
 };
 
-} // namespace bearings
+} // namespace geomony

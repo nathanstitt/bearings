@@ -2,15 +2,15 @@
 #include <string>
 #include <memory>
 
-#include "bearings/BearingsCore.h"
-#include "bearings/PlatformBridge.h"
-#include "bearings/Logger.h"
-#include "bearings/Location.h"
-#include "bearings/Geofence.h"
+#include "geomony/GeomonyCore.h"
+#include "geomony/PlatformBridge.h"
+#include "geomony/Logger.h"
+#include "geomony/Location.h"
+#include "geomony/Geofence.h"
 
 static JavaVM* gJavaVM = nullptr;
 
-class AndroidPlatformBridge : public bearings::PlatformBridge {
+class AndroidPlatformBridge : public geomony::PlatformBridge {
 public:
     AndroidPlatformBridge(JNIEnv* env, jobject bridge)
         : bridge_(env->NewGlobalRef(bridge)) {
@@ -30,6 +30,9 @@ public:
         removeAllGeofencesMethod_ = env->GetMethodID(cls, "onRemoveAllGeofences", "()V");
         startScheduleTimerMethod_ = env->GetMethodID(cls, "onStartScheduleTimer", "(I)V");
         cancelScheduleTimerMethod_ = env->GetMethodID(cls, "onCancelScheduleTimer", "()V");
+        sendHTTPRequestMethod_ = env->GetMethodID(cls, "onSendHTTPRequest", "(Ljava/lang/String;Ljava/lang/String;I)V");
+        startSyncRetryTimerMethod_ = env->GetMethodID(cls, "onStartSyncRetryTimer", "(I)V");
+        cancelSyncRetryTimerMethod_ = env->GetMethodID(cls, "onCancelSyncRetryTimer", "()V");
     }
 
     ~AndroidPlatformBridge() {
@@ -146,6 +149,30 @@ public:
         env->CallVoidMethod(bridge_, cancelScheduleTimerMethod_);
     }
 
+    void sendHTTPRequest(const std::string& url,
+                         const std::string& jsonPayload,
+                         int requestId) override {
+        JNIEnv* env = getEnv();
+        if (!env) return;
+        jstring jUrl = env->NewStringUTF(url.c_str());
+        jstring jPayload = env->NewStringUTF(jsonPayload.c_str());
+        env->CallVoidMethod(bridge_, sendHTTPRequestMethod_, jUrl, jPayload, (jint)requestId);
+        env->DeleteLocalRef(jUrl);
+        env->DeleteLocalRef(jPayload);
+    }
+
+    void startSyncRetryTimer(int delaySeconds) override {
+        JNIEnv* env = getEnv();
+        if (!env) return;
+        env->CallVoidMethod(bridge_, startSyncRetryTimerMethod_, (jint)delaySeconds);
+    }
+
+    void cancelSyncRetryTimer() override {
+        JNIEnv* env = getEnv();
+        if (!env) return;
+        env->CallVoidMethod(bridge_, cancelSyncRetryTimerMethod_);
+    }
+
 private:
     JNIEnv* getEnv() {
         JNIEnv* env = nullptr;
@@ -174,6 +201,9 @@ private:
     jmethodID removeAllGeofencesMethod_;
     jmethodID startScheduleTimerMethod_;
     jmethodID cancelScheduleTimerMethod_;
+    jmethodID sendHTTPRequestMethod_;
+    jmethodID startSyncRetryTimerMethod_;
+    jmethodID cancelSyncRetryTimerMethod_;
 };
 
 extern "C" {
@@ -184,28 +214,28 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeCreate(JNIEnv* env, jobject thiz) {
+Java_com_geomony_GeomonyPlatformBridge_nativeCreate(JNIEnv* env, jobject thiz) {
     auto bridge = std::make_shared<AndroidPlatformBridge>(env, thiz);
-    auto core = new bearings::BearingsCore(bridge);
+    auto core = new geomony::GeomonyCore(bridge);
 
-    bearings::Logger::instance().setHandler([](bearings::LogLevel level, const std::string& message) {
+    geomony::Logger::instance().setHandler([](geomony::LogLevel level, const std::string& message) {
         JNIEnv* env = nullptr;
         if (gJavaVM) {
             gJavaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         }
         if (!env) return;
 
-        const char* tag = "Bearings";
+        const char* tag = "Geomony";
         jclass logClass = env->FindClass("android/util/Log");
         jmethodID logMethod;
         switch (level) {
-            case bearings::LogLevel::Debug:
+            case geomony::LogLevel::Debug:
                 logMethod = env->GetStaticMethodID(logClass, "d", "(Ljava/lang/String;Ljava/lang/String;)I");
                 break;
-            case bearings::LogLevel::Warning:
+            case geomony::LogLevel::Warning:
                 logMethod = env->GetStaticMethodID(logClass, "w", "(Ljava/lang/String;Ljava/lang/String;)I");
                 break;
-            case bearings::LogLevel::Error:
+            case geomony::LogLevel::Error:
                 logMethod = env->GetStaticMethodID(logClass, "e", "(Ljava/lang/String;Ljava/lang/String;)I");
                 break;
             default:
@@ -224,60 +254,60 @@ Java_com_bearings_BearingsPlatformBridge_nativeCreate(JNIEnv* env, jobject thiz)
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeDestroy(JNIEnv*, jobject, jlong ptr) {
-    delete reinterpret_cast<bearings::BearingsCore*>(ptr);
+Java_com_geomony_GeomonyPlatformBridge_nativeDestroy(JNIEnv*, jobject, jlong ptr) {
+    delete reinterpret_cast<geomony::GeomonyCore*>(ptr);
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeConfigure(JNIEnv* env, jobject, jlong ptr, jstring config) {
-    auto core = reinterpret_cast<bearings::BearingsCore*>(ptr);
+Java_com_geomony_GeomonyPlatformBridge_nativeConfigure(JNIEnv* env, jobject, jlong ptr, jstring config) {
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
     const char* str = env->GetStringUTFChars(config, nullptr);
     core->configure(str);
     env->ReleaseStringUTFChars(config, str);
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeStart(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->start();
+Java_com_geomony_GeomonyPlatformBridge_nativeStart(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->start();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeStop(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->stop();
+Java_com_geomony_GeomonyPlatformBridge_nativeStop(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->stop();
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeGetState(JNIEnv* env, jobject, jlong ptr) {
-    auto state = reinterpret_cast<bearings::BearingsCore*>(ptr)->getState();
+Java_com_geomony_GeomonyPlatformBridge_nativeGetState(JNIEnv* env, jobject, jlong ptr) {
+    auto state = reinterpret_cast<geomony::GeomonyCore*>(ptr)->getState();
     return env->NewStringUTF(state.c_str());
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeGetLocations(JNIEnv* env, jobject, jlong ptr) {
-    auto locations = reinterpret_cast<bearings::BearingsCore*>(ptr)->getLocations();
+Java_com_geomony_GeomonyPlatformBridge_nativeGetLocations(JNIEnv* env, jobject, jlong ptr) {
+    auto locations = reinterpret_cast<geomony::GeomonyCore*>(ptr)->getLocations();
     return env->NewStringUTF(locations.c_str());
 }
 
 JNIEXPORT jint JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeGetCount(JNIEnv*, jobject, jlong ptr) {
-    return reinterpret_cast<bearings::BearingsCore*>(ptr)->getCount();
+Java_com_geomony_GeomonyPlatformBridge_nativeGetCount(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->getCount();
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeDestroyLocations(JNIEnv*, jobject, jlong ptr) {
-    return reinterpret_cast<bearings::BearingsCore*>(ptr)->destroyLocations();
+Java_com_geomony_GeomonyPlatformBridge_nativeDestroyLocations(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->destroyLocations();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnLocationReceived(
+Java_com_geomony_GeomonyPlatformBridge_nativeOnLocationReceived(
     JNIEnv* env, jobject, jlong ptr,
     jdouble lat, jdouble lng, jdouble alt,
     jdouble speed, jdouble heading, jdouble accuracy,
     jdouble speedAccuracy, jdouble headingAccuracy, jdouble altitudeAccuracy,
     jstring timestamp, jstring uuid) {
 
-    auto core = reinterpret_cast<bearings::BearingsCore*>(ptr);
-    bearings::Location loc;
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
+    geomony::Location loc;
     loc.latitude = lat;
     loc.longitude = lng;
     loc.altitude = alt;
@@ -310,24 +340,24 @@ Java_com_bearings_BearingsPlatformBridge_nativeOnLocationReceived(
 // --- Callbacks from Kotlin to C++ ---
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnMotionDetected(JNIEnv*, jobject, jlong ptr, jint activityType, jint confidence) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->onMotionDetected(activityType, confidence);
+Java_com_geomony_GeomonyPlatformBridge_nativeOnMotionDetected(JNIEnv*, jobject, jlong ptr, jint activityType, jint confidence) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onMotionDetected(activityType, confidence);
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnStopTimerFired(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->onStopTimerFired();
+Java_com_geomony_GeomonyPlatformBridge_nativeOnStopTimerFired(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onStopTimerFired();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnGeofenceExit(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->onGeofenceExit();
+Java_com_geomony_GeomonyPlatformBridge_nativeOnGeofenceExit(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onGeofenceExit();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnGeofenceEvent(JNIEnv* env, jobject, jlong ptr,
+Java_com_geomony_GeomonyPlatformBridge_nativeOnGeofenceEvent(JNIEnv* env, jobject, jlong ptr,
     jstring identifier, jstring action) {
-    auto core = reinterpret_cast<bearings::BearingsCore*>(ptr);
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
     const char* id = env->GetStringUTFChars(identifier, nullptr);
     const char* act = env->GetStringUTFChars(action, nullptr);
     core->onGeofenceEvent(id, act);
@@ -336,8 +366,8 @@ Java_com_bearings_BearingsPlatformBridge_nativeOnGeofenceEvent(JNIEnv* env, jobj
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeAddGeofence(JNIEnv* env, jobject, jlong ptr, jstring json) {
-    auto core = reinterpret_cast<bearings::BearingsCore*>(ptr);
+Java_com_geomony_GeomonyPlatformBridge_nativeAddGeofence(JNIEnv* env, jobject, jlong ptr, jstring json) {
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
     const char* str = env->GetStringUTFChars(json, nullptr);
     bool result = core->addGeofence(str);
     env->ReleaseStringUTFChars(json, str);
@@ -345,8 +375,8 @@ Java_com_bearings_BearingsPlatformBridge_nativeAddGeofence(JNIEnv* env, jobject,
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeRemoveGeofence(JNIEnv* env, jobject, jlong ptr, jstring identifier) {
-    auto core = reinterpret_cast<bearings::BearingsCore*>(ptr);
+Java_com_geomony_GeomonyPlatformBridge_nativeRemoveGeofence(JNIEnv* env, jobject, jlong ptr, jstring identifier) {
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
     const char* id = env->GetStringUTFChars(identifier, nullptr);
     bool result = core->removeGeofence(id);
     env->ReleaseStringUTFChars(identifier, id);
@@ -354,35 +384,50 @@ Java_com_bearings_BearingsPlatformBridge_nativeRemoveGeofence(JNIEnv* env, jobje
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeRemoveAllGeofences(JNIEnv*, jobject, jlong ptr) {
-    return reinterpret_cast<bearings::BearingsCore*>(ptr)->removeAllGeofences();
+Java_com_geomony_GeomonyPlatformBridge_nativeRemoveAllGeofences(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->removeAllGeofences();
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeGetGeofences(JNIEnv* env, jobject, jlong ptr) {
-    auto geofences = reinterpret_cast<bearings::BearingsCore*>(ptr)->getGeofences();
+Java_com_geomony_GeomonyPlatformBridge_nativeGetGeofences(JNIEnv* env, jobject, jlong ptr) {
+    auto geofences = reinterpret_cast<geomony::GeomonyCore*>(ptr)->getGeofences();
     return env->NewStringUTF(geofences.c_str());
 }
 
 // --- Schedule ---
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeStartSchedule(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->startSchedule();
+Java_com_geomony_GeomonyPlatformBridge_nativeStartSchedule(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->startSchedule();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeStopSchedule(JNIEnv*, jobject, jlong ptr) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->stopSchedule();
+Java_com_geomony_GeomonyPlatformBridge_nativeStopSchedule(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->stopSchedule();
 }
 
 JNIEXPORT void JNICALL
-Java_com_bearings_BearingsPlatformBridge_nativeOnScheduleTimerFired(
+Java_com_geomony_GeomonyPlatformBridge_nativeOnScheduleTimerFired(
     JNIEnv*, jobject, jlong ptr,
     jint year, jint month, jint day, jint dayOfWeek,
     jint hour, jint minute, jint second) {
-    reinterpret_cast<bearings::BearingsCore*>(ptr)->onScheduleTimerFired(
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onScheduleTimerFired(
         year, month, day, dayOfWeek, hour, minute, second);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeGetStopOnTerminate(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->getStopOnTerminate();
+}
+
+JNIEXPORT void JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeOnSyncComplete(JNIEnv*, jobject, jlong ptr, jint requestId, jboolean success) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onSyncComplete(requestId, success);
+}
+
+JNIEXPORT void JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeOnSyncRetryTimerFired(JNIEnv*, jobject, jlong ptr) {
+    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onSyncRetryTimerFired();
 }
 
 } // extern "C"

@@ -1,12 +1,12 @@
 #include "test.h"
 #include "MockPlatformBridge.h"
-#include "bearings/BearingsCore.h"
-#include "bearings/Location.h"
+#include "geomony/GeomonyCore.h"
+#include "geomony/Location.h"
 #include <nlohmann/json.hpp>
 #include <memory>
 
 using json = nlohmann::json;
-using namespace bearings;
+using namespace geomony;
 
 // Helper: create a location at given lat/lon
 static Location makeLoc(double lat, double lon) {
@@ -21,11 +21,11 @@ static Location makeLoc(double lat, double lon) {
 // Helper: build a configured & started core with a mock bridge
 struct TestHarness {
     std::shared_ptr<test::MockPlatformBridge> bridge;
-    std::unique_ptr<BearingsCore> core;
+    std::unique_ptr<GeomonyCore> core;
 
     TestHarness(double distanceFilter = 10.0) {
         bridge = std::make_shared<test::MockPlatformBridge>();
-        core = std::make_unique<BearingsCore>(bridge);
+        core = std::make_unique<GeomonyCore>(bridge);
         json config = {{"distanceFilter", distanceFilter}};
         core->configure(config.dump());
         core->start();
@@ -121,7 +121,7 @@ TEST(distance_filter_resets_baseline_after_dispatch) {
 
 TEST(locations_not_dispatched_when_not_tracking) {
     auto bridge = std::make_shared<test::MockPlatformBridge>();
-    BearingsCore core(bridge);
+    GeomonyCore core(bridge);
     json config = {{"distanceFilter", 10.0}};
     core.configure(config.dump());
     // don't call start()
@@ -216,7 +216,7 @@ TEST(dispatched_locations_are_stored) {
 
 TEST(start_sets_moving_state) {
     auto bridge = std::make_shared<test::MockPlatformBridge>();
-    BearingsCore core(bridge);
+    GeomonyCore core(bridge);
     core.configure(R"({"distanceFilter":10})");
     core.start();
 
@@ -264,11 +264,11 @@ TEST(geofence_exit_transitions_to_moving) {
 // Helper: build a sync-configured core
 struct SyncTestHarness {
     std::shared_ptr<test::MockPlatformBridge> bridge;
-    std::unique_ptr<BearingsCore> core;
+    std::unique_ptr<GeomonyCore> core;
 
     SyncTestHarness(int syncThreshold = 5, int maxBatchSize = 100) {
         bridge = std::make_shared<test::MockPlatformBridge>();
-        core = std::make_unique<BearingsCore>(bridge);
+        core = std::make_unique<GeomonyCore>(bridge);
         json config = {
             {"distanceFilter", 0},
             {"url", "https://example.com/locations"},
@@ -303,7 +303,7 @@ struct SyncTestHarness {
 
 TEST(sync_disabled_when_no_url) {
     auto bridge = std::make_shared<test::MockPlatformBridge>();
-    BearingsCore core(bridge);
+    GeomonyCore core(bridge);
     json config = {{"distanceFilter", 0}, {"syncThreshold", 1}};
     core.configure(config.dump());
     core.start();
@@ -543,6 +543,109 @@ TEST(stop_cancels_sync_retry_timer) {
 
     h.core->stop();
     ASSERT_FALSE(h.bridge->syncRetryTimerRunning);
+}
+
+// ---- stopOnTerminate / onTerminate ----
+
+TEST(getStopOnTerminate_defaults_to_true) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    GeomonyCore core(bridge);
+    core.configure(R"({"distanceFilter":10})");
+
+    ASSERT_TRUE(core.getStopOnTerminate());
+}
+
+TEST(getStopOnTerminate_respects_config) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    GeomonyCore core(bridge);
+    core.configure(R"({"stopOnTerminate":false})");
+
+    ASSERT_FALSE(core.getStopOnTerminate());
+}
+
+TEST(onTerminate_stops_when_stopOnTerminate_true) {
+    TestHarness h;
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+
+    h.core->onTerminate();
+
+    json state = json::parse(h.core->getState());
+    ASSERT_FALSE(state["tracking"].get<bool>());
+    ASSERT_FALSE(h.bridge->locationUpdatesRunning);
+    ASSERT_FALSE(h.bridge->motionActivityRunning);
+}
+
+TEST(onTerminate_leaves_geofence_when_stopOnTerminate_false) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    auto core = std::make_unique<GeomonyCore>(bridge);
+    core->configure(R"({"stopOnTerminate":false,"distanceFilter":10})");
+    core->start();
+    core->onLocationReceived(makeLoc(40.0, -74.0));
+    bridge->clearEvents();
+
+    core->onTerminate();
+
+    // Location updates and motion activity should be stopped
+    ASSERT_FALSE(bridge->locationUpdatesRunning);
+    ASSERT_FALSE(bridge->motionActivityRunning);
+    // But a stationary geofence should be placed (was MOVING with a last location)
+    ASSERT_TRUE(bridge->stationaryGeofenceActive);
+}
+
+TEST(onTerminate_preserves_existing_geofence_when_stationary) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    auto core = std::make_unique<GeomonyCore>(bridge);
+    core->configure(R"({"stopOnTerminate":false,"distanceFilter":10})");
+    core->start();
+    core->onLocationReceived(makeLoc(40.0, -74.0));
+
+    // Transition to stationary — geofence placed by state machine
+    core->onMotionDetected(1, 100); // STATIONARY
+    core->onStopTimerFired();
+    ASSERT_TRUE(bridge->stationaryGeofenceActive);
+
+    core->onTerminate();
+
+    // Geofence should still be active (not removed by stop())
+    ASSERT_TRUE(bridge->stationaryGeofenceActive);
+    ASSERT_FALSE(bridge->locationUpdatesRunning);
+    ASSERT_FALSE(bridge->motionActivityRunning);
+}
+
+TEST(onTerminate_is_idempotent) {
+    TestHarness h;
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+
+    h.core->onTerminate();
+    h.core->onTerminate(); // should not crash
+}
+
+TEST(destructor_respects_stopOnTerminate_false) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    {
+        auto core = std::make_unique<GeomonyCore>(bridge);
+        core->configure(R"({"stopOnTerminate":false,"distanceFilter":10})");
+        core->start();
+        core->onLocationReceived(makeLoc(40.0, -74.0));
+    } // destructor fires here
+
+    // Geofence should be active after destruction
+    ASSERT_TRUE(bridge->stationaryGeofenceActive);
+}
+
+TEST(destructor_stops_when_stopOnTerminate_true) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    {
+        auto core = std::make_unique<GeomonyCore>(bridge);
+        core->configure(R"({"stopOnTerminate":true,"distanceFilter":10})");
+        core->start();
+        core->onLocationReceived(makeLoc(40.0, -74.0));
+    } // destructor fires here
+
+    // Everything should be cleaned up
+    ASSERT_FALSE(bridge->locationUpdatesRunning);
+    ASSERT_FALSE(bridge->motionActivityRunning);
+    ASSERT_FALSE(bridge->stationaryGeofenceActive);
 }
 
 int main() {

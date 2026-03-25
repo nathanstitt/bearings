@@ -7,7 +7,7 @@
 struct sqlite3;
 struct sqlite3_stmt;
 
-namespace bearings {
+namespace geomony {
 
 class LocationStore {
 public:
@@ -32,4 +32,4 @@ private:
     sqlite3* db_ = nullptr;
 };
 
-} // namespace bearings
+} // namespace geomony

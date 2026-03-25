@@ -1,10 +1,10 @@
-#include "bearings/BearingsCore.h"
-#include "bearings/Logger.h"
+#include "geomony/GeomonyCore.h"
+#include "geomony/Logger.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-namespace bearings {
+namespace geomony {
 
 bool isMovingForActivity(ActivityType type) {
     switch (type) {
@@ -43,20 +43,50 @@ ActivityType activityTypeFromInt(int type) {
     }
 }
 
-BearingsCore::BearingsCore(std::shared_ptr<PlatformBridge> bridge)
+GeomonyCore::GeomonyCore(std::shared_ptr<PlatformBridge> bridge)
     : bridge_(std::move(bridge)) {
 }
 
-BearingsCore::~BearingsCore() {
-    if (schedulerRunning_) {
-        stopSchedule();
-    }
-    if (tracking_) {
-        stop();
+GeomonyCore::~GeomonyCore() {
+    onTerminate();
+}
+
+bool GeomonyCore::getStopOnTerminate() const {
+    return config_.stopOnTerminate;
+}
+
+void GeomonyCore::onTerminate() {
+    if (terminated_) return;
+    terminated_ = true;
+
+    if (config_.stopOnTerminate) {
+        if (schedulerRunning_) stopSchedule();
+        if (tracking_) stop();
+    } else if (tracking_) {
+        // Cancel timers that won't survive process death
+        if (stopTimerRunning_) {
+            bridge_->cancelStopTimer();
+            stopTimerRunning_ = false;
+        }
+        if (syncRetryTimerRunning_) {
+            bridge_->cancelSyncRetryTimer();
+            syncRetryTimerRunning_ = false;
+        }
+        bridge_->stopMotionActivity();
+        bridge_->stopLocationUpdates();
+
+        // Ensure a stationary geofence is active for iOS relaunch
+        if (motionState_ == MotionState::MOVING && hasLastLocation_) {
+            bridge_->startStationaryGeofence(
+                lastLocation_.latitude, lastLocation_.longitude,
+                config_.stationaryRadius);
+        }
+        // If already STATIONARY, geofence is already active — leave it.
+        // Do NOT call stop() — that would remove the geofence.
     }
 }
 
-void BearingsCore::configure(const std::string& configJson) {
+void GeomonyCore::configure(const std::string& configJson) {
     config_.merge(configJson);
 
     if (!configured_) {
@@ -94,7 +124,7 @@ void BearingsCore::configure(const std::string& configJson) {
     Logger::instance().info("Configured: " + config_.toJson());
 }
 
-void BearingsCore::start() {
+void GeomonyCore::start() {
     if (!configured_) {
         Logger::instance().error("Cannot start: not configured");
         return;
@@ -113,7 +143,7 @@ void BearingsCore::start() {
     Logger::instance().info("Tracking started");
 }
 
-void BearingsCore::stop() {
+void GeomonyCore::stop() {
     if (!tracking_) return;
 
     // Clean up timer
@@ -153,7 +183,7 @@ void BearingsCore::stop() {
     Logger::instance().info("Tracking stopped");
 }
 
-std::string BearingsCore::getState() {
+std::string GeomonyCore::getState() {
     json j = {
         {"enabled", tracking_},
         {"tracking", tracking_},
@@ -174,20 +204,20 @@ std::string BearingsCore::getState() {
     return j.dump();
 }
 
-std::string BearingsCore::getLocations() {
+std::string GeomonyCore::getLocations() {
     auto locations = store_.getAll();
     return Location::toJsonArray(locations);
 }
 
-int BearingsCore::getCount() {
+int GeomonyCore::getCount() {
     return store_.getCount();
 }
 
-bool BearingsCore::destroyLocations() {
+bool GeomonyCore::destroyLocations() {
     return store_.destroyAll();
 }
 
-bool BearingsCore::addGeofence(const std::string& json) {
+bool GeomonyCore::addGeofence(const std::string& json) {
     if (!configured_) {
         Logger::instance().error("Cannot add geofence: not configured");
         return false;
@@ -201,8 +231,8 @@ bool BearingsCore::addGeofence(const std::string& json) {
     }
 
     // Reject reserved prefix
-    if (g.identifier.rfind("__bearings_", 0) == 0) {
-        Logger::instance().error("Cannot add geofence: identifier prefix '__bearings_' is reserved");
+    if (g.identifier.rfind("__geomony_", 0) == 0) {
+        Logger::instance().error("Cannot add geofence: identifier prefix '__geomony_' is reserved");
         return false;
     }
 
@@ -225,7 +255,7 @@ bool BearingsCore::addGeofence(const std::string& json) {
     return true;
 }
 
-bool BearingsCore::removeGeofence(const std::string& identifier) {
+bool GeomonyCore::removeGeofence(const std::string& identifier) {
     if (!configured_) return false;
 
     bridge_->removeGeofence(identifier);
@@ -234,7 +264,7 @@ bool BearingsCore::removeGeofence(const std::string& identifier) {
     return true;
 }
 
-bool BearingsCore::removeAllGeofences() {
+bool GeomonyCore::removeAllGeofences() {
     if (!configured_) return false;
 
     bridge_->removeAllGeofences();
@@ -243,12 +273,12 @@ bool BearingsCore::removeAllGeofences() {
     return true;
 }
 
-std::string BearingsCore::getGeofences() {
+std::string GeomonyCore::getGeofences() {
     if (!configured_) return "[]";
     return Geofence::toJsonArray(geofenceStore_.getAll());
 }
 
-void BearingsCore::onGeofenceEvent(const std::string& identifier, const std::string& action) {
+void GeomonyCore::onGeofenceEvent(const std::string& identifier, const std::string& action) {
     Geofence g = geofenceStore_.get(identifier);
     if (g.identifier.empty()) {
         Logger::instance().warning("Geofence event for unknown identifier: " + identifier);
@@ -270,7 +300,7 @@ void BearingsCore::onGeofenceEvent(const std::string& identifier, const std::str
     maybeSync();
 }
 
-void BearingsCore::onLocationReceived(const Location& location) {
+void GeomonyCore::onLocationReceived(const Location& location) {
     if (!tracking_) return;
 
     // Override isMoving from state machine, not raw speed
@@ -312,7 +342,7 @@ void BearingsCore::onLocationReceived(const Location& location) {
     }
 }
 
-void BearingsCore::onMotionDetected(int activityTypeInt, int confidence) {
+void GeomonyCore::onMotionDetected(int activityTypeInt, int confidence) {
     if (!tracking_) return;
 
     ActivityType activity = activityTypeFromInt(activityTypeInt);
@@ -349,7 +379,7 @@ void BearingsCore::onMotionDetected(int activityTypeInt, int confidence) {
     }
 }
 
-void BearingsCore::onStopTimerFired() {
+void GeomonyCore::onStopTimerFired() {
     if (!tracking_) return;
     stopTimerRunning_ = false;
 
@@ -358,7 +388,7 @@ void BearingsCore::onStopTimerFired() {
     }
 }
 
-void BearingsCore::onGeofenceExit() {
+void GeomonyCore::onGeofenceExit() {
     if (!tracking_) return;
 
     if (motionState_ == MotionState::STATIONARY) {
@@ -366,7 +396,7 @@ void BearingsCore::onGeofenceExit() {
     }
 }
 
-void BearingsCore::transitionToMoving() {
+void GeomonyCore::transitionToMoving() {
     Logger::instance().info("STATIONARY -> MOVING");
     motionState_ = MotionState::MOVING;
     bridge_->stopStationaryGeofence();
@@ -374,7 +404,7 @@ void BearingsCore::transitionToMoving() {
     dispatchMotionChange();
 }
 
-void BearingsCore::transitionToStationary() {
+void GeomonyCore::transitionToStationary() {
     Logger::instance().info("MOVING -> STATIONARY");
     motionState_ = MotionState::STATIONARY;
     bridge_->stopLocationUpdates();
@@ -389,7 +419,7 @@ void BearingsCore::transitionToStationary() {
     }
 }
 
-void BearingsCore::dispatchMotionChange() {
+void GeomonyCore::dispatchMotionChange() {
     if (!hasLastLocation_) return;
 
     Location loc = lastLocation_;
@@ -407,7 +437,7 @@ void BearingsCore::dispatchMotionChange() {
     hasLastDispatchedLocation_ = true;
 }
 
-void BearingsCore::dispatchActivityChange() {
+void GeomonyCore::dispatchActivityChange() {
     std::string typeStr = activityTypeToString(currentActivity_);
     json j = {
         {"activity", {
@@ -421,7 +451,7 @@ void BearingsCore::dispatchActivityChange() {
 
 // --- Schedule ---
 
-void BearingsCore::startSchedule() {
+void GeomonyCore::startSchedule() {
     if (!configured_) {
         Logger::instance().error("Cannot start schedule: not configured");
         return;
@@ -438,7 +468,7 @@ void BearingsCore::startSchedule() {
     bridge_->startScheduleTimer(0);
 }
 
-void BearingsCore::stopSchedule() {
+void GeomonyCore::stopSchedule() {
     bridge_->cancelScheduleTimer();
 
     if (schedulerTracking_) {
@@ -450,7 +480,7 @@ void BearingsCore::stopSchedule() {
     Logger::instance().info("Schedule stopped");
 }
 
-void BearingsCore::onScheduleTimerFired(int year, int month, int day, int dayOfWeek,
+void GeomonyCore::onScheduleTimerFired(int year, int month, int day, int dayOfWeek,
                                          int hour, int minute, int second) {
     if (!schedulerRunning_) return;
 
@@ -480,11 +510,11 @@ void BearingsCore::onScheduleTimerFired(int year, int month, int day, int dayOfW
 
 // --- Sync ---
 
-bool BearingsCore::isSyncEnabled() const {
+bool GeomonyCore::isSyncEnabled() const {
     return !config_.url.empty();
 }
 
-void BearingsCore::maybeSync() {
+void GeomonyCore::maybeSync() {
     if (!isSyncEnabled()) return;
     if (!configured_) return;
     if (syncInFlight_) return;
@@ -493,7 +523,7 @@ void BearingsCore::maybeSync() {
     performSync();
 }
 
-void BearingsCore::performSync() {
+void GeomonyCore::performSync() {
     auto unsynced = store_.getUnsynced(config_.maxBatchSize);
     if (unsynced.empty()) return;
 
@@ -509,7 +539,7 @@ void BearingsCore::performSync() {
     bridge_->sendHTTPRequest(config_.url, payload.dump(), activeRequestId_);
 }
 
-void BearingsCore::onSyncComplete(int requestId, bool success) {
+void GeomonyCore::onSyncComplete(int requestId, bool success) {
     if (requestId != activeRequestId_) return;
 
     syncInFlight_ = false;
@@ -542,13 +572,13 @@ void BearingsCore::onSyncComplete(int requestId, bool success) {
     }
 }
 
-void BearingsCore::onSyncRetryTimerFired() {
+void GeomonyCore::onSyncRetryTimerFired() {
     syncRetryTimerRunning_ = false;
     connected_ = true;
     maybeSync();
 }
 
-void BearingsCore::onConnectivityChange(bool connected) {
+void GeomonyCore::onConnectivityChange(bool connected) {
     connected_ = connected;
 
     if (connected) {
@@ -561,4 +591,4 @@ void BearingsCore::onConnectivityChange(bool connected) {
     }
 }
 
-} // namespace bearings
+} // namespace geomony

@@ -1,10 +1,10 @@
-#include "bearings/Schedule.h"
-#include "bearings/Logger.h"
+#include "geomony/Schedule.h"
+#include "geomony/Logger.h"
 
 #include <algorithm>
 #include <sstream>
 
-namespace bearings {
+namespace geomony {
 
 namespace {
 
@@ -236,4 +236,4 @@ EvalResult Schedule::evaluate(int year, int month, int dayOfMonth, int dayOfWeek
     return result;
 }
 
-} // namespace bearings
+} // namespace geomony

@@ -1,5 +1,5 @@
 {
-  "name": "bearings",
+  "name": "geomony",
   "version": "0.1.0",
   "description": "Background Geolocation, battery-conscious background location-tracking & geofencing SDKReact Native Background Geolocation",
   "main": "./lib/module/index.js",
@@ -32,15 +32,15 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace bearings-example",
+    "example": "yarn workspace geomony-example",
     "clean": "del-cli lib",
     "prepare": "bob build",
     "typecheck": "tsc",
     "test": "yarn test:core",
     "release": "release-it --only-version",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "test:core": "cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1 && cmake --build cpp/build --target bearings_tests 2>&1 && cpp/build/bearings_tests",
-    "build:ios": "xcodebuild -workspace example/ios/BearingsExample.xcworkspace -scheme BearingsExample -sdk iphonesimulator -configuration Debug build"
+    "test:core": "cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1 && cmake --build cpp/build --target geomony_tests 2>&1 && cpp/build/geomony_tests",
+    "build:ios": "xcodebuild -workspace example/ios/GeomonyExample.xcworkspace -scheme GeomonyExample -sdk iphonesimulator -configuration Debug build"
   },
   "keywords": [
     "react-native",
@@ -112,11 +112,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "BearingsSpec",
+    "name": "GeomonySpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.bearings"
+      "javaPackageName": "com.geomony"
     }
   },
   "jest": {

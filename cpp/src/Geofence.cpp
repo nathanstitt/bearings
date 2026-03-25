@@ -1,9 +1,9 @@
-#include "bearings/Geofence.h"
+#include "geomony/Geofence.h"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-namespace bearings {
+namespace geomony {
 
 Geofence Geofence::fromJson(const std::string& jsonStr) {
     Geofence g;
@@ -46,4 +46,4 @@ std::string Geofence::toJsonArray(const std::vector<Geofence>& geofences) {
     return arr.dump();
 }
 
-} // namespace bearings
+} // namespace geomony

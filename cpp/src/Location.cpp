@@ -1,4 +1,4 @@
-#include "bearings/Location.h"
+#include "geomony/Location.h"
 #include <nlohmann/json.hpp>
 #include <cmath>
 #include <sstream>
@@ -8,7 +8,7 @@
 
 using json = nlohmann::json;
 
-namespace bearings {
+namespace geomony {
 
 namespace {
 
@@ -151,4 +151,4 @@ double Location::distanceTo(const Location& other) const {
     return EARTH_RADIUS * c;
 }
 
-} // namespace bearings
+} // namespace geomony

@@ -1,12 +1,12 @@
-#import "BearingsLocationDelegate.h"
-#include "bearings/BearingsCore.h"
-#include "bearings/Location.h"
+#import "GeomonyLocationDelegate.h"
+#include "geomony/GeomonyCore.h"
+#include "geomony/Location.h"
 
 #include <chrono>
 #include <sstream>
 #include <iomanip>
 
-@implementation BearingsLocationDelegate
+@implementation GeomonyLocationDelegate
 
 - (instancetype)init {
     self = [super init];
@@ -100,7 +100,7 @@
 
     _stationaryRegion = [[CLCircularRegion alloc] initWithCenter:center
                                                           radius:clampedRadius
-                                                      identifier:@"__bearings_stationary"];
+                                                      identifier:@"__geomony_stationary"];
     _stationaryRegion.notifyOnEntry = NO;
     _stationaryRegion.notifyOnExit = YES;
 
@@ -115,7 +115,7 @@
 }
 
 - (void)locationManager:(CLLocationManager *)manager didEnterRegion:(CLRegion *)region {
-    if ([region.identifier hasPrefix:@"__bearings_"]) return;
+    if ([region.identifier hasPrefix:@"__geomony_"]) return;
     if (!_core) return;
 
     _core->onGeofenceEvent([region.identifier UTF8String], "ENTER");
@@ -129,11 +129,11 @@
 }
 
 - (void)locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region {
-    if ([region.identifier isEqualToString:@"__bearings_stationary"]) {
+    if ([region.identifier isEqualToString:@"__geomony_stationary"]) {
         if (_core) _core->onGeofenceExit();
         return;
     }
-    if ([region.identifier hasPrefix:@"__bearings_"]) return;
+    if ([region.identifier hasPrefix:@"__geomony_"]) return;
     if (!_core) return;
 
     // Cancel dwell timer if running
@@ -170,7 +170,7 @@
 }
 
 - (void)removeGeofenceWithIdentifier:(NSString*)identifier {
-    if ([identifier hasPrefix:@"__bearings_"]) return;
+    if ([identifier hasPrefix:@"__geomony_"]) return;
 
     for (CLRegion* region in _locationManager.monitoredRegions) {
         if ([region.identifier isEqualToString:identifier]) {
@@ -186,7 +186,7 @@
 - (void)removeAllGeofences {
     NSMutableArray* toRemove = [NSMutableArray new];
     for (CLRegion* region in _locationManager.monitoredRegions) {
-        if (![region.identifier hasPrefix:@"__bearings_"]) {
+        if (![region.identifier hasPrefix:@"__geomony_"]) {
             [toRemove addObject:region];
         }
     }
@@ -315,6 +315,65 @@
     );
 }
 
+#pragma mark - Sync
+
+- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload requestId:(int)requestId {
+    NSURL* nsUrl = [NSURL URLWithString:url];
+    if (!nsUrl) {
+        if (_core) _core->onSyncComplete(requestId, false);
+        return;
+    }
+
+    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
+    request.HTTPMethod = @"POST";
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    request.HTTPBody = [jsonPayload dataUsingEncoding:NSUTF8StringEncoding];
+
+    __weak __typeof(self) weakSelf = self;
+    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
+        dataTaskWithRequest:request
+        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            BOOL success = NO;
+            if (!error) {
+                NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
+                success = (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300);
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (weakSelf.core) {
+                    weakSelf.core->onSyncComplete(requestId, success);
+                }
+            });
+        }];
+    [task resume];
+}
+
+- (void)startSyncRetryTimerWithSeconds:(int)seconds {
+    [self cancelSyncRetryTimer];
+
+    __weak __typeof(self) weakSelf = self;
+    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(timer,
+                              dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
+                              DISPATCH_TIME_FOREVER,
+                              (int64_t)(1 * NSEC_PER_SEC));
+    dispatch_source_set_event_handler(timer, ^{
+        if (weakSelf.core) {
+            weakSelf.core->onSyncRetryTimerFired();
+        }
+        dispatch_source_cancel(timer);
+        weakSelf.syncRetryTimer = nil;
+    });
+    dispatch_resume(timer);
+    _syncRetryTimer = timer;
+}
+
+- (void)cancelSyncRetryTimer {
+    if (_syncRetryTimer) {
+        dispatch_source_cancel(_syncRetryTimer);
+        _syncRetryTimer = nil;
+    }
+}
+
 #pragma mark - CLLocationManagerDelegate
 
 - (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations {
@@ -326,7 +385,7 @@
     }
 
     for (CLLocation* clLocation in locations) {
-        bearings::Location loc;
+        geomony::Location loc;
         loc.latitude = clLocation.coordinate.latitude;
         loc.longitude = clLocation.coordinate.longitude;
         loc.altitude = clLocation.altitude;
@@ -356,7 +415,7 @@
 }
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
-    NSLog(@"[Bearings] Location error: %@", error.localizedDescription);
+    NSLog(@"[Geomony] Location error: %@", error.localizedDescription);
 }
 
 @end

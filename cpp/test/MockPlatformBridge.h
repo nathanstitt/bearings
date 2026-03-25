@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bearings/PlatformBridge.h"
+#include "geomony/PlatformBridge.h"
 #include <string>
 #include <vector>
 #include <utility>
@@ -14,7 +14,7 @@ struct DispatchedEvent {
     std::string json;
 };
 
-class MockPlatformBridge : public bearings::PlatformBridge {
+class MockPlatformBridge : public geomony::PlatformBridge {
 public:
     // Dispatched events, inspectable by tests
     std::vector<DispatchedEvent> events;
@@ -32,7 +32,7 @@ public:
     std::string dbPath;
 
     MockPlatformBridge() {
-        auto tmp = std::filesystem::temp_directory_path() / "bearings_test_XXXXXX";
+        auto tmp = std::filesystem::temp_directory_path() / "geomony_test_XXXXXX";
         dbPath = tmp.string() + ".db";
     }
 
