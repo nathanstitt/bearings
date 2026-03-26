@@ -12,6 +12,8 @@ set(GEOMONY_SOURCES
     src/LocationStore.cpp
     src/Geofence.cpp
     src/GeofenceStore.cpp
+    src/GeofenceEventRecord.cpp
+    src/GeofenceEventStore.cpp
     src/Logger.cpp
     vendor/sqlite3/sqlite3.c
 )

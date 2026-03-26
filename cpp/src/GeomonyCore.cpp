@@ -1,6 +1,8 @@
 #include "geomony/GeomonyCore.h"
+#include "geomony/GeofenceEventRecord.h"
 #include "geomony/Logger.h"
 #include <nlohmann/json.hpp>
+#include <chrono>
 
 using json = nlohmann::json;
 
@@ -99,6 +101,10 @@ void GeomonyCore::configure(const std::string& configJson) {
             Logger::instance().error("Failed to open geofence database");
             return;
         }
+        if (!geofenceEventStore_.open(dbPath)) {
+            Logger::instance().error("Failed to open geofence event database");
+            return;
+        }
         configured_ = true;
 
         // Re-register persisted geofences with the platform
@@ -168,6 +174,7 @@ void GeomonyCore::stop() {
     syncInFlight_ = false;
     activeRequestId_ = 0;
     pendingSyncIds_.clear();
+    pendingGeofenceEventSyncIds_.clear();
     syncRetryCount_ = 0;
     connected_ = true;
 
@@ -198,6 +205,7 @@ std::string GeomonyCore::getState() {
             {"connected", connected_},
             {"syncInFlight", syncInFlight_},
             {"unsyncedCount", configured_ ? store_.getUnsyncedCount() : 0},
+            {"geofenceEventUnsyncedCount", configured_ ? geofenceEventStore_.getUnsyncedCount() : 0},
         }},
         {"config", json::parse(config_.toJson())},
     };
@@ -288,14 +296,49 @@ void GeomonyCore::onGeofenceEvent(const std::string& identifier, const std::stri
     json j = {
         {"identifier", identifier},
         {"action", action},
-        {"extras", g.extras},
     };
+
+    // Emit extras as JSON object if parseable, otherwise as string
+    if (!g.extras.empty()) {
+        auto parsed = json::parse(g.extras, nullptr, false);
+        if (!parsed.is_discarded()) {
+            j["extras"] = parsed;
+        } else {
+            j["extras"] = g.extras;
+        }
+    }
+
     if (hasLastLocation_) {
         j["location"] = json::parse(lastLocation_.toJson());
     }
 
     bridge_->dispatchEvent("geofence", j.dump());
     Logger::instance().info("Geofence event: " + action + " for " + identifier);
+
+    // Persist geofence event for sync
+    if (configured_) {
+        GeofenceEventRecord record;
+        record.identifier = identifier;
+        record.action = action;
+        record.extras = g.extras;
+        if (hasLastLocation_) {
+            record.latitude = lastLocation_.latitude;
+            record.longitude = lastLocation_.longitude;
+            record.accuracy = lastLocation_.accuracy;
+            record.timestamp = lastLocation_.timestamp;
+        } else {
+            record.timestamp = "";
+        }
+        // Generate createdAt
+        auto now = std::chrono::system_clock::now();
+        auto time_t_val = std::chrono::system_clock::to_time_t(now);
+        char buf[32];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", std::gmtime(&time_t_val));
+        record.createdAt = std::string(buf) + "Z";
+        record.timestamp = record.createdAt;
+
+        geofenceEventStore_.insert(record);
+    }
 
     maybeSync();
 }
@@ -337,7 +380,8 @@ void GeomonyCore::onLocationReceived(const Location& location) {
         std::to_string(loc.latitude) + ", " +
         std::to_string(loc.longitude));
 
-    if (isSyncEnabled() && store_.getUnsyncedCount() >= config_.syncThreshold) {
+    int totalUnsynced = store_.getUnsyncedCount() + geofenceEventStore_.getUnsyncedCount();
+    if (isSyncEnabled() && totalUnsynced >= config_.syncThreshold) {
         maybeSync();
     }
 }
@@ -449,6 +493,23 @@ void GeomonyCore::dispatchActivityChange() {
     Logger::instance().info("Activity change: " + typeStr + " (" + std::to_string(currentActivityConfidence_) + "%)");
 }
 
+// --- Geofence Event Store API ---
+
+std::string GeomonyCore::getGeofenceEvents() {
+    if (!configured_) return "[]";
+    return GeofenceEventRecord::toJsonArray(geofenceEventStore_.getAll());
+}
+
+int GeomonyCore::getGeofenceEventCount() {
+    if (!configured_) return 0;
+    return geofenceEventStore_.getCount();
+}
+
+bool GeomonyCore::destroyGeofenceEvents() {
+    if (!configured_) return false;
+    return geofenceEventStore_.destroyAll();
+}
+
 // --- Schedule ---
 
 void GeomonyCore::startSchedule() {
@@ -525,35 +586,81 @@ void GeomonyCore::maybeSync() {
 
 void GeomonyCore::performSync() {
     auto unsynced = store_.getUnsynced(config_.maxBatchSize);
-    if (unsynced.empty()) return;
+    if (unsynced.empty()) {
+        // Check for unsynced geofence events
+        auto unsyncedGeoEvents = geofenceEventStore_.getUnsynced(config_.maxBatchSize);
+        if (unsyncedGeoEvents.empty()) return;
+    }
+
+    auto unsyncedLocs = store_.getUnsynced(config_.maxBatchSize);
+    auto unsyncedGeoEvents = geofenceEventStore_.getUnsynced(config_.maxBatchSize);
+
+    if (unsyncedLocs.empty() && unsyncedGeoEvents.empty()) return;
 
     pendingSyncIds_.clear();
-    for (const auto& loc : unsynced) {
+    for (const auto& loc : unsyncedLocs) {
         pendingSyncIds_.push_back(loc.id);
     }
 
-    json payload = {{"location", json::parse(Location::toSyncJsonArray(unsynced))}};
+    pendingGeofenceEventSyncIds_.clear();
+    for (const auto& ev : unsyncedGeoEvents) {
+        pendingGeofenceEventSyncIds_.push_back(ev.id);
+    }
+
+    json payload;
+    if (!unsyncedLocs.empty()) {
+        payload["location"] = json::parse(Location::toSyncJsonArray(unsyncedLocs));
+    }
+    if (!unsyncedGeoEvents.empty()) {
+        json geoArr = json::array();
+        for (const auto& ev : unsyncedGeoEvents) {
+            geoArr.push_back(json::parse(ev.toJson()));
+        }
+        payload["geofence"] = geoArr;
+    }
+
+    // Serialize headers to JSON
+    json headersJson = json(config_.headers);
 
     activeRequestId_ = nextRequestId_++;
     syncInFlight_ = true;
-    bridge_->sendHTTPRequest(config_.url, payload.dump(), activeRequestId_);
+    bridge_->sendHTTPRequest(config_.url, payload.dump(), headersJson.dump(), activeRequestId_);
 }
 
-void GeomonyCore::onSyncComplete(int requestId, bool success) {
+void GeomonyCore::onSyncComplete(int requestId, bool success,
+                                   int httpStatus, const std::string& responseText) {
     if (requestId != activeRequestId_) return;
 
     syncInFlight_ = false;
 
+    // Dispatch http event
+    json httpEv = {
+        {"status", httpStatus},
+        {"responseText", responseText},
+        {"success", success},
+    };
+    bridge_->dispatchEvent("http", httpEv.dump());
+
     if (success) {
         store_.markSynced(pendingSyncIds_);
-        int syncedCount = static_cast<int>(pendingSyncIds_.size());
+        geofenceEventStore_.markSynced(pendingGeofenceEventSyncIds_);
+        int syncedCount = static_cast<int>(pendingSyncIds_.size()) +
+                          static_cast<int>(pendingGeofenceEventSyncIds_.size());
         pendingSyncIds_.clear();
+        pendingGeofenceEventSyncIds_.clear();
         syncRetryCount_ = 0;
+        awaitingAuthRefresh_ = false;
 
         json ev = {{"success", true}, {"count", syncedCount}};
         bridge_->dispatchEvent("sync", ev.dump());
 
         maybeSync();
+    } else if (httpStatus == 401 || httpStatus == 403) {
+        // Auth failure — ask JS to refresh credentials
+        awaitingAuthRefresh_ = true;
+        Logger::instance().info("Sync auth failure (" + std::to_string(httpStatus) +
+            ") — requesting authorization refresh");
+        bridge_->dispatchEvent("authorizationRefresh", httpEv.dump());
     } else {
         connected_ = false;
         syncRetryCount_++;
@@ -569,6 +676,25 @@ void GeomonyCore::onSyncComplete(int requestId, bool success) {
 
         json ev = {{"success", false}};
         bridge_->dispatchEvent("sync", ev.dump());
+    }
+}
+
+void GeomonyCore::updateAuthorizationHeaders(const std::string& headersJson) {
+    json j = json::parse(headersJson, nullptr, false);
+    if (j.is_discarded() || !j.is_object()) return;
+
+    config_.headers.clear();
+    for (auto& [key, val] : j.items()) {
+        if (val.is_string()) config_.headers[key] = val.get<std::string>();
+    }
+
+    Logger::instance().info("Authorization headers updated");
+
+    if (awaitingAuthRefresh_) {
+        awaitingAuthRefresh_ = false;
+        syncRetryCount_ = 0;
+        connected_ = true;
+        performSync();
     }
 }
 

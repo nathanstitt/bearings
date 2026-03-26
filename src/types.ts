@@ -44,6 +44,7 @@ export interface Config {
   syncThreshold: number;
   maxBatchSize: number;
   syncRetryBaseSeconds: number;
+  headers?: Record<string, string>;
   enabled: boolean;
   schedule?: string[];
   scheduleUseAlarmManager?: boolean;
@@ -54,6 +55,7 @@ export interface SyncState {
   connected: boolean;
   syncInFlight: boolean;
   unsyncedCount: number;
+  geofenceEventUnsyncedCount: number;
 }
 
 export interface State {
@@ -84,14 +86,35 @@ export interface Geofence {
   notifyOnExit: boolean;
   notifyOnDwell: boolean;
   loiteringDelay: number;
-  extras?: string;
+  extras?: Record<string, unknown>;
 }
 
 export interface GeofenceEvent {
   identifier: string;
   action: 'ENTER' | 'EXIT' | 'DWELL';
   location?: Location;
-  extras?: string;
+  extras?: Record<string, unknown>;
+}
+
+export interface PersistedGeofenceEvent {
+  identifier: string;
+  action: 'ENTER' | 'EXIT' | 'DWELL';
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  extras?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface HttpEvent {
+  status: number;
+  responseText: string;
+  success: boolean;
+}
+
+export interface AuthorizationRefreshEvent {
+  status: number;
+  responseText: string;
 }
 
 export interface ScheduleEvent {

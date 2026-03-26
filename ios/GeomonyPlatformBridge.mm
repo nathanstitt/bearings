@@ -155,16 +155,18 @@ void GeomonyPlatformBridgeImpl::cancelScheduleTimer() {
 
 void GeomonyPlatformBridgeImpl::sendHTTPRequest(const std::string& url,
                                                   const std::string& jsonPayload,
+                                                  const std::string& headersJson,
                                                   int requestId) {
     Geomony* mod = module_;
     if (!mod) return;
 
     NSString* nsUrl = [NSString stringWithUTF8String:url.c_str()];
     NSString* nsPayload = [NSString stringWithUTF8String:jsonPayload.c_str()];
+    NSString* nsHeaders = [NSString stringWithUTF8String:headersJson.c_str()];
     int rid = requestId;
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        [mod.locationDelegate sendHTTPRequest:nsUrl payload:nsPayload requestId:rid];
+        [mod.locationDelegate sendHTTPRequest:nsUrl payload:nsPayload headers:nsHeaders requestId:rid];
     });
 }
 

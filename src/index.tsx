@@ -2,11 +2,14 @@ import { NativeEventEmitter } from 'react-native';
 import NativeGeomony from './NativeGeomony';
 import type {
   ActivityChangeEvent,
+  AuthorizationRefreshEvent,
   Config,
   Geofence,
   GeofenceEvent,
+  HttpEvent,
   Location,
   MotionChangeEvent,
+  PersistedGeofenceEvent,
   ScheduleEvent,
   State,
   Subscription,
@@ -16,11 +19,14 @@ export type {
   Activity,
   ActivityChangeEvent,
   ActivityType,
+  AuthorizationRefreshEvent,
   Config,
   Geofence,
   GeofenceEvent,
+  HttpEvent,
   Location,
   MotionChangeEvent,
+  PersistedGeofenceEvent,
   ScheduleEvent,
   State,
   Subscription,
@@ -79,6 +85,57 @@ export async function removeGeofences(): Promise<boolean> {
 export async function getGeofences(): Promise<Geofence[]> {
   const result = await NativeGeomony.getGeofences();
   return JSON.parse(result) as Geofence[];
+}
+
+export async function addGeofences(geofences: Geofence[]): Promise<boolean> {
+  for (const geofence of geofences) {
+    const result = await addGeofence(geofence);
+    if (!result) return false;
+  }
+  return true;
+}
+
+export async function getGeofenceEvents(): Promise<PersistedGeofenceEvent[]> {
+  const result = await NativeGeomony.getGeofenceEvents();
+  return JSON.parse(result) as PersistedGeofenceEvent[];
+}
+
+export async function getGeofenceEventCount(): Promise<number> {
+  return NativeGeomony.getGeofenceEventCount();
+}
+
+export async function destroyGeofenceEvents(): Promise<boolean> {
+  return NativeGeomony.destroyGeofenceEvents();
+}
+
+export function onAuthorizationRefresh(
+  callback: (
+    event: AuthorizationRefreshEvent
+  ) => Promise<Record<string, string> | null>
+): Subscription {
+  const subscription = emitter.addListener('authorizationRefresh', (data) => {
+    const json = data as string;
+    const event = JSON.parse(json) as AuthorizationRefreshEvent;
+    callback(event).then((headers) => {
+      if (headers) {
+        NativeGeomony.updateAuthorizationHeaders(JSON.stringify(headers));
+      }
+    });
+  });
+  return {
+    remove: () => subscription.remove(),
+  };
+}
+
+export function onHttp(callback: (event: HttpEvent) => void): Subscription {
+  const subscription = emitter.addListener('http', (data) => {
+    const json = data as string;
+    const event = JSON.parse(json) as HttpEvent;
+    callback(event);
+  });
+  return {
+    remove: () => subscription.remove(),
+  };
 }
 
 export function onGeofence(

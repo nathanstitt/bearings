@@ -33,6 +33,7 @@ public:
 
     virtual void sendHTTPRequest(const std::string& url,
                                  const std::string& jsonPayload,
+                                 const std::string& headersJson,
                                  int requestId) = 0;
     virtual void startSyncRetryTimer(int delaySeconds) = 0;
     virtual void cancelSyncRetryTimer() = 0;

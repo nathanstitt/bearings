@@ -300,9 +300,11 @@ class GeomonyLocationService(
 
     private var syncRetryRunnable: Runnable? = null
 
-    fun sendHTTPRequest(url: String, jsonPayload: String, requestId: Int) {
+    fun sendHTTPRequest(url: String, jsonPayload: String, headersJson: String, requestId: Int) {
         Thread {
             var success = false
+            var statusCode = 0
+            var responseText = ""
             try {
                 val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
                 connection.requestMethod = "POST"
@@ -311,19 +313,40 @@ class GeomonyLocationService(
                 connection.connectTimeout = 30_000
                 connection.readTimeout = 30_000
 
+                // Apply custom headers
+                try {
+                    val headers = org.json.JSONObject(headersJson)
+                    val keys = headers.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        connection.setRequestProperty(key, headers.getString(key))
+                    }
+                } catch (_: Exception) {
+                    // Ignore header parse errors
+                }
+
                 connection.outputStream.use { os ->
                     os.write(jsonPayload.toByteArray(Charsets.UTF_8))
                 }
 
-                val responseCode = connection.responseCode
-                success = responseCode in 200..299
+                statusCode = connection.responseCode
+                success = statusCode in 200..299
+                responseText = try {
+                    if (success) {
+                        connection.inputStream.bufferedReader().readText()
+                    } else {
+                        connection.errorStream?.bufferedReader()?.readText() ?: ""
+                    }
+                } catch (_: Exception) { "" }
                 connection.disconnect()
             } catch (_: Exception) {
                 success = false
             }
             val result = success
+            val code = statusCode
+            val body = responseText
             mainHandler.post {
-                bridge.notifySyncComplete(requestId, result)
+                bridge.notifySyncComplete(requestId, result, code, body)
             }
         }.start()
     }

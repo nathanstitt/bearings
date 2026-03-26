@@ -26,6 +26,12 @@ void Config::merge(const std::string& jsonStr) {
     if (j.contains("syncThreshold")) syncThreshold = j["syncThreshold"].get<int>();
     if (j.contains("maxBatchSize")) maxBatchSize = j["maxBatchSize"].get<int>();
     if (j.contains("syncRetryBaseSeconds")) syncRetryBaseSeconds = j["syncRetryBaseSeconds"].get<int>();
+    if (j.contains("headers") && j["headers"].is_object()) {
+        headers.clear();
+        for (auto& [key, val] : j["headers"].items()) {
+            if (val.is_string()) headers[key] = val.get<std::string>();
+        }
+    }
     if (j.contains("enabled")) enabled = j["enabled"].get<bool>();
     if (j.contains("schedule")) schedule = j["schedule"].get<std::vector<std::string>>();
     if (j.contains("scheduleUseAlarmManager")) scheduleUseAlarmManager = j["scheduleUseAlarmManager"].get<bool>();
@@ -44,6 +50,7 @@ std::string Config::toJson() const {
         {"syncThreshold", syncThreshold},
         {"maxBatchSize", maxBatchSize},
         {"syncRetryBaseSeconds", syncRetryBaseSeconds},
+        {"headers", headers},
         {"enabled", enabled},
         {"schedule", schedule},
         {"scheduleUseAlarmManager", scheduleUseAlarmManager},

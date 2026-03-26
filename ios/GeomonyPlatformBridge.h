@@ -34,6 +34,7 @@ public:
 
     void sendHTTPRequest(const std::string& url,
                          const std::string& jsonPayload,
+                         const std::string& headersJson,
                          int requestId) override;
     void startSyncRetryTimer(int delaySeconds) override;
     void cancelSyncRetryTimer() override;

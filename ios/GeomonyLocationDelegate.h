@@ -45,7 +45,7 @@ namespace geomony {
 - (void)cancelScheduleTimer;
 - (void)evaluateScheduleNow;
 
-- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload requestId:(int)requestId;
+- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload headers:(NSString*)headersJson requestId:(int)requestId;
 - (void)startSyncRetryTimerWithSeconds:(int)seconds;
 - (void)cancelSyncRetryTimer;
 

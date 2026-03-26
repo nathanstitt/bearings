@@ -317,10 +317,10 @@
 
 #pragma mark - Sync
 
-- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload requestId:(int)requestId {
+- (void)sendHTTPRequest:(NSString*)url payload:(NSString*)jsonPayload headers:(NSString*)headersJson requestId:(int)requestId {
     NSURL* nsUrl = [NSURL URLWithString:url];
     if (!nsUrl) {
-        if (_core) _core->onSyncComplete(requestId, false);
+        if (_core) _core->onSyncComplete(requestId, false, 0, "");
         return;
     }
 
@@ -329,18 +329,38 @@
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     request.HTTPBody = [jsonPayload dataUsingEncoding:NSUTF8StringEncoding];
 
+    // Apply custom headers
+    if (headersJson && headersJson.length > 0) {
+        NSData* headersData = [headersJson dataUsingEncoding:NSUTF8StringEncoding];
+        NSDictionary* headers = [NSJSONSerialization JSONObjectWithData:headersData options:0 error:nil];
+        if ([headers isKindOfClass:[NSDictionary class]]) {
+            for (NSString* key in headers) {
+                NSString* value = headers[key];
+                if ([value isKindOfClass:[NSString class]]) {
+                    [request setValue:value forHTTPHeaderField:key];
+                }
+            }
+        }
+    }
+
     __weak __typeof(self) weakSelf = self;
     NSURLSessionDataTask* task = [[NSURLSession sharedSession]
         dataTaskWithRequest:request
         completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
             BOOL success = NO;
+            int statusCode = 0;
+            NSString* responseText = @"";
             if (!error) {
                 NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
-                success = (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300);
+                statusCode = (int)httpResponse.statusCode;
+                success = (statusCode >= 200 && statusCode < 300);
+                if (data) {
+                    responseText = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
+                }
             }
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (weakSelf.core) {
-                    weakSelf.core->onSyncComplete(requestId, success);
+                    weakSelf.core->onSyncComplete(requestId, success, statusCode, [responseText UTF8String]);
                 }
             });
         }];

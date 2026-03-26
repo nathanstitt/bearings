@@ -8,7 +8,10 @@ Built as a [Turbo Module](https://reactnative.dev/docs/the-new-architecture/pill
 
 - Background location tracking with configurable accuracy and distance filters
 - Offline-aware HTTP sync with batching, exponential backoff, and priority geofence sync
+- Custom HTTP headers for authenticated sync (e.g. `Authorization: Bearer <token>`)
+- HTTP event callbacks for detecting 401s and handling token refresh
 - Geofencing with ENTER, EXIT, and DWELL events
+- Geofence event persistence and sync alongside locations
 - Schedule-based tracking windows
 - SQLite-backed persistent location storage
 - Motion-change detection (MOVING / STATIONARY state machine)
@@ -40,10 +43,12 @@ import {
   onLocation,
   onMotionChange,
   addGeofence,
+  addGeofences,
   onGeofence,
+  onAuthorizationRefresh,
 } from 'geomony';
 
-// Configure
+// Configure with auth headers
 await configure({
   desiredAccuracy: -1,
   distanceFilter: 10,
@@ -53,6 +58,9 @@ await configure({
   url: 'https://my-server.com/locations',
   syncThreshold: 5,
   maxBatchSize: 100,
+  headers: {
+    Authorization: 'Bearer my-jwt-token',
+  },
 });
 
 // Subscribe to location updates
@@ -65,10 +73,16 @@ const motionSub = onMotionChange((event) => {
   console.log('[motion]', event.isMoving ? 'MOVING' : 'STATIONARY');
 });
 
+// Handle auth failures — geomony calls this on 401/403, retries automatically
+const authSub = onAuthorizationRefresh(async () => {
+  const newToken = await refreshMyToken();
+  return { Authorization: `Bearer ${newToken}` };
+});
+
 // Start tracking
 await start();
 
-// Add a geofence
+// Add a geofence with structured extras
 await addGeofence({
   identifier: 'home',
   latitude: 40.785091,
@@ -78,11 +92,26 @@ await addGeofence({
   notifyOnExit: true,
   notifyOnDwell: false,
   loiteringDelay: 0,
+  extras: { jobId: '123', orgId: '456' },
 });
+
+// Or add multiple geofences at once
+await addGeofences([
+  {
+    identifier: 'office',
+    latitude: 40.7128,
+    longitude: -74.006,
+    radius: 150,
+    notifyOnEntry: true,
+    notifyOnExit: true,
+    notifyOnDwell: false,
+    loiteringDelay: 0,
+  },
+]);
 
 // Subscribe to geofence events
 const geofenceSub = onGeofence((event) => {
-  console.log('[geofence]', event.identifier, event.action);
+  console.log('[geofence]', event.identifier, event.action, event.extras);
 });
 
 // Stop tracking
@@ -91,6 +120,7 @@ await stop();
 // Clean up subscriptions
 locationSub.remove();
 motionSub.remove();
+authSub.remove();
 geofenceSub.remove();
 ```
 
@@ -118,9 +148,13 @@ geofenceSub.remove();
 | Function | Returns | Description |
 |----------|---------|-------------|
 | `addGeofence(geofence)` | `Promise<boolean>` | Register a geofence. |
+| `addGeofences(geofences)` | `Promise<boolean>` | Register multiple geofences. Returns `false` if any fails. |
 | `removeGeofence(identifier)` | `Promise<boolean>` | Remove a geofence by identifier. |
 | `removeGeofences()` | `Promise<boolean>` | Remove all geofences. |
 | `getGeofences()` | `Promise<Geofence[]>` | Get all registered geofences. |
+| `getGeofenceEvents()` | `Promise<PersistedGeofenceEvent[]>` | Get all persisted geofence events. |
+| `getGeofenceEventCount()` | `Promise<number>` | Get count of persisted geofence events. |
+| `destroyGeofenceEvents()` | `Promise<boolean>` | Delete all persisted geofence events. |
 
 ### Scheduling
 
@@ -171,20 +205,25 @@ When multiple rules overlap, tracking is active if *any* rule matches. The sched
 | `onMotionChange(callback)` | `MotionChangeEvent` | Fired when motion state changes. |
 | `onActivityChange(callback)` | `ActivityChangeEvent` | Fired when detected activity changes (walking, driving, etc). |
 | `onSchedule(callback)` | `ScheduleEvent` | Fired when a schedule window starts or stops. |
+| `onHttp(callback)` | `HttpEvent` | Fired after each sync HTTP request with status, response text, and success flag. |
+| `onAuthorizationRefresh(callback)` | `AuthorizationRefreshEvent` | Fired on 401/403 sync failure. Callback returns fresh headers; sync retries immediately. |
 
 All event subscribers return a `Subscription` with a `remove()` method.
 
 ### HTTP Sync
 
-When a `url` is configured, Geomony automatically POSTs stored locations to your server. Sync is offline-aware — locations accumulate in SQLite while offline and flush when connectivity is restored.
+When a `url` is configured, Geomony automatically POSTs stored locations and geofence events to your server. Sync is offline-aware — records accumulate in SQLite while offline and flush when connectivity is restored.
 
 **Behavior:**
-- Sync triggers when unsynced location count reaches `syncThreshold`.
+- Sync triggers when the total unsynced count (locations + geofence events) reaches `syncThreshold`.
 - Geofence ENTER/EXIT events trigger an immediate sync regardless of threshold.
-- On HTTP failure, the device is treated as offline and retries with exponential backoff (base `syncRetryBaseSeconds`, capped at 300s).
-- When connectivity is restored, the backoff resets and pending locations sync immediately.
-- Locations are never marked as synced until the server responds with success.
-- Only one sync request is in flight at a time; remaining locations flush in subsequent batches.
+- Custom HTTP headers (e.g. `Authorization`) are sent with every sync request via the `headers` config option.
+- The `onHttp` event fires after each sync HTTP request with `{ status, responseText, success }`.
+- On 401/403 responses, geomony dispatches an `authorizationRefresh` event instead of entering backoff. The `onAuthorizationRefresh` callback returns fresh headers and sync retries immediately.
+- On other HTTP failures, the device is treated as offline and retries with exponential backoff (base `syncRetryBaseSeconds`, capped at 300s).
+- When connectivity is restored, the backoff resets and pending records sync immediately.
+- Records are never marked as synced until the server responds with a 2xx status.
+- Only one sync request is in flight at a time; remaining records flush in subsequent batches.
 
 **POST payload format:**
 ```json
@@ -207,9 +246,40 @@ When a `url` is configured, Geomony automatically POSTs stored locations to your
       "event": "",
       "extras": ""
     }
+  ],
+  "geofence": [
+    {
+      "identifier": "home",
+      "action": "ENTER",
+      "latitude": 40.785,
+      "longitude": -73.968,
+      "accuracy": 5.0,
+      "extras": { "jobId": "123" },
+      "timestamp": "2026-01-01T00:00:00Z"
+    }
   ]
 }
 ```
+
+The `location` and `geofence` keys are only present when there are unsynced records of that type.
+
+**Auth headers example:**
+
+```typescript
+// Set initial headers
+await configure({
+  url: 'https://api.example.com/locations',
+  headers: { Authorization: `Bearer ${token}` },
+});
+
+// Handle 401/403 — refresh token and retry automatically
+onAuthorizationRefresh(async () => {
+  const newToken = await refreshToken();
+  return { Authorization: `Bearer ${newToken}` };
+});
+```
+
+When the sync endpoint returns 401 or 403, geomony pauses sync (no backoff timer) and fires the `onAuthorizationRefresh` callback. The callback should return a `Record<string, string>` with updated headers, or `null` to skip the retry. On receiving new headers, geomony updates the config and immediately retries the sync flush.
 
 The `getState()` response includes a `sync` object:
 
@@ -219,6 +289,7 @@ The `getState()` response includes a `sync` object:
 | `sync.connected` | `boolean` | Current connectivity status. |
 | `sync.syncInFlight` | `boolean` | Whether a sync request is currently in progress. |
 | `sync.unsyncedCount` | `number` | Number of locations awaiting sync. |
+| `sync.geofenceEventUnsyncedCount` | `number` | Number of geofence events awaiting sync. |
 
 ### Config
 
@@ -235,6 +306,7 @@ The `getState()` response includes a `sync` object:
 | `syncThreshold` | `number` | `5` | Number of unsynced locations before a sync is triggered. |
 | `maxBatchSize` | `number` | `100` | Maximum locations per HTTP POST request. |
 | `syncRetryBaseSeconds` | `number` | `10` | Base delay (seconds) for exponential backoff on sync failure. |
+| `headers` | `Record<string, string>` | `{}` | Custom HTTP headers sent with every sync request (e.g. `{ Authorization: 'Bearer ...' }`). |
 | `enabled` | `boolean` | `false` | Whether tracking is currently enabled. |
 | `schedule` | `string[]` | — | Schedule windows for time-based tracking. |
 | `scheduleUseAlarmManager` | `boolean` | — | Use AlarmManager for schedule triggers (Android). |

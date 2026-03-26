@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@ struct Config {
     int syncThreshold = 5;
     int maxBatchSize = 100;
     int syncRetryBaseSeconds = 10;
+    std::map<std::string, std::string> headers;
     bool enabled = false;
     std::vector<std::string> schedule;
     bool scheduleUseAlarmManager = false;

@@ -89,16 +89,19 @@ public:
     int lastSendRequestId = 0;
     std::string lastSendUrl;
     std::string lastSendPayload;
+    std::string lastSendHeaders;
     bool sendWasCalled = false;
     int sendCallCount = 0;
 
     void sendHTTPRequest(const std::string& url,
                          const std::string& jsonPayload,
+                         const std::string& headersJson,
                          int requestId) override {
         sendWasCalled = true;
         sendCallCount++;
         lastSendUrl = url;
         lastSendPayload = jsonPayload;
+        lastSendHeaders = headersJson;
         lastSendRequestId = requestId;
     }
 

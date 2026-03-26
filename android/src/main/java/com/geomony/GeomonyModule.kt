@@ -114,6 +114,39 @@ class GeomonyModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    override fun updateAuthorizationHeaders(headersJson: String, promise: Promise) {
+        try {
+            getBridge().updateAuthorizationHeaders(headersJson)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("GEOMONY_ERROR", e.message, e)
+        }
+    }
+
+    override fun getGeofenceEvents(promise: Promise) {
+        try {
+            promise.resolve(getBridge().getGeofenceEvents())
+        } catch (e: Exception) {
+            promise.reject("GEOMONY_ERROR", e.message, e)
+        }
+    }
+
+    override fun getGeofenceEventCount(promise: Promise) {
+        try {
+            promise.resolve(getBridge().getGeofenceEventCount().toDouble())
+        } catch (e: Exception) {
+            promise.reject("GEOMONY_ERROR", e.message, e)
+        }
+    }
+
+    override fun destroyGeofenceEvents(promise: Promise) {
+        try {
+            promise.resolve(getBridge().destroyGeofenceEvents())
+        } catch (e: Exception) {
+            promise.reject("GEOMONY_ERROR", e.message, e)
+        }
+    }
+
     override fun startSchedule(promise: Promise) {
         try {
             val bridge = getBridge()

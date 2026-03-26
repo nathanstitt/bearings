@@ -18,7 +18,13 @@ Geofence Geofence::fromJson(const std::string& jsonStr) {
     g.notifyOnExit = j.value("notifyOnExit", true);
     g.notifyOnDwell = j.value("notifyOnDwell", false);
     g.loiteringDelay = j.value("loiteringDelay", 30000);
-    g.extras = j.value("extras", std::string());
+    if (j.contains("extras")) {
+        if (j["extras"].is_object() || j["extras"].is_array()) {
+            g.extras = j["extras"].dump();
+        } else if (j["extras"].is_string()) {
+            g.extras = j["extras"].get<std::string>();
+        }
+    }
 
     return g;
 }
@@ -33,8 +39,15 @@ std::string Geofence::toJson() const {
         {"notifyOnExit", notifyOnExit},
         {"notifyOnDwell", notifyOnDwell},
         {"loiteringDelay", loiteringDelay},
-        {"extras", extras},
     };
+    if (!extras.empty()) {
+        auto parsed = json::parse(extras, nullptr, false);
+        if (!parsed.is_discarded()) {
+            j["extras"] = parsed;
+        } else {
+            j["extras"] = extras;
+        }
+    }
     return j.dump();
 }
 

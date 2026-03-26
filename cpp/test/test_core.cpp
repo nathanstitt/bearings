@@ -648,6 +648,241 @@ TEST(destructor_stops_when_stopOnTerminate_true) {
     ASSERT_FALSE(bridge->stationaryGeofenceActive);
 }
 
+// ---- HTTP headers passthrough ----
+
+TEST(sync_passes_headers_to_bridge) {
+    auto bridge = std::make_shared<test::MockPlatformBridge>();
+    GeomonyCore core(bridge);
+    json config = {
+        {"distanceFilter", 0},
+        {"url", "https://example.com/locations"},
+        {"syncThreshold", 1},
+        {"headers", {{"Authorization", "Bearer tok123"}, {"X-Custom", "value"}}},
+    };
+    core.configure(config.dump());
+    core.start();
+    bridge->clearEvents();
+
+    core.onLocationReceived(makeLoc(40.0, -74.0));
+
+    ASSERT_TRUE(bridge->sendWasCalled);
+    json headers = json::parse(bridge->lastSendHeaders);
+    ASSERT_EQ(headers["Authorization"].get<std::string>(), "Bearer tok123");
+    ASSERT_EQ(headers["X-Custom"].get<std::string>(), "value");
+}
+
+// ---- HTTP event dispatch ----
+
+TEST(sync_complete_dispatches_http_event) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, true, 200, "{\"ok\":true}");
+
+    auto httpEvents = h.bridge->eventsNamed("http");
+    ASSERT_EQ(httpEvents.size(), 1u);
+    json ev = json::parse(httpEvents[0].json);
+    ASSERT_EQ(ev["status"].get<int>(), 200);
+    ASSERT_EQ(ev["responseText"].get<std::string>(), "{\"ok\":true}");
+    ASSERT_TRUE(ev["success"].get<bool>());
+}
+
+TEST(sync_failure_dispatches_http_event_with_status) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false, 401, "Unauthorized");
+
+    auto httpEvents = h.bridge->eventsNamed("http");
+    ASSERT_EQ(httpEvents.size(), 1u);
+    json ev = json::parse(httpEvents[0].json);
+    ASSERT_EQ(ev["status"].get<int>(), 401);
+    ASSERT_FALSE(ev["success"].get<bool>());
+}
+
+// ---- Geofence event persistence and sync ----
+
+TEST(geofence_event_persisted_to_store) {
+    SyncTestHarness h(100); // high threshold so no auto-sync
+
+    h.addTestGeofence("office");
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+    h.bridge->clearEvents();
+
+    h.core->onGeofenceEvent("office", "ENTER");
+
+    ASSERT_EQ(h.core->getGeofenceEventCount(), 1);
+
+    json events = json::parse(h.core->getGeofenceEvents());
+    ASSERT_EQ(events.size(), 1u);
+    ASSERT_EQ(events[0]["identifier"].get<std::string>(), "office");
+    ASSERT_EQ(events[0]["action"].get<std::string>(), "ENTER");
+}
+
+TEST(geofence_events_included_in_sync_payload) {
+    SyncTestHarness h(100);
+
+    h.addTestGeofence("office");
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+    h.core->onGeofenceEvent("office", "ENTER");
+
+    // Geofence event triggers maybeSync
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    json payload = json::parse(h.bridge->lastSendPayload);
+    ASSERT_TRUE(payload.contains("geofence"));
+    ASSERT_EQ(payload["geofence"].size(), 1u);
+    ASSERT_EQ(payload["geofence"][0]["identifier"].get<std::string>(), "office");
+}
+
+TEST(geofence_events_marked_synced_on_success) {
+    SyncTestHarness h(100);
+
+    h.addTestGeofence("office");
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+    h.core->onGeofenceEvent("office", "ENTER");
+
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, true, 200, "");
+
+    json state = json::parse(h.core->getState());
+    ASSERT_EQ(state["sync"]["geofenceEventUnsyncedCount"].get<int>(), 0);
+}
+
+TEST(destroy_geofence_events) {
+    SyncTestHarness h(100);
+
+    h.addTestGeofence("office");
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+    h.core->onGeofenceEvent("office", "ENTER");
+    ASSERT_EQ(h.core->getGeofenceEventCount(), 1);
+
+    h.core->destroyGeofenceEvents();
+    ASSERT_EQ(h.core->getGeofenceEventCount(), 0);
+}
+
+// ---- Geofence extras as JSON object ----
+
+TEST(geofence_extras_parsed_as_json_object) {
+    SyncTestHarness h(100);
+
+    json g = {
+        {"identifier", "office"},
+        {"latitude", 40.0},
+        {"longitude", -74.0},
+        {"radius", 200.0},
+        {"notifyOnEntry", true},
+        {"notifyOnExit", true},
+        {"extras", {{"jobId", "123"}, {"orgId", "456"}}},
+    };
+    h.core->addGeofence(g.dump());
+
+    // Verify extras stored and emitted as JSON object
+    json geofences = json::parse(h.core->getGeofences());
+    ASSERT_EQ(geofences.size(), 1u);
+    ASSERT_TRUE(geofences[0]["extras"].is_object());
+    ASSERT_EQ(geofences[0]["extras"]["jobId"].get<std::string>(), "123");
+}
+
+TEST(geofence_event_emits_extras_as_json_object) {
+    SyncTestHarness h(100);
+
+    json g = {
+        {"identifier", "office"},
+        {"latitude", 40.0},
+        {"longitude", -74.0},
+        {"radius", 200.0},
+        {"notifyOnEntry", true},
+        {"notifyOnExit", true},
+        {"extras", {{"jobId", "abc"}}},
+    };
+    h.core->addGeofence(g.dump());
+    h.core->onLocationReceived(makeLoc(40.0, -74.0));
+    h.bridge->clearEvents();
+
+    h.core->onGeofenceEvent("office", "ENTER");
+
+    auto geofenceEvents = h.bridge->eventsNamed("geofence");
+    ASSERT_EQ(geofenceEvents.size(), 1u);
+    json ev = json::parse(geofenceEvents[0].json);
+    ASSERT_TRUE(ev["extras"].is_object());
+    ASSERT_EQ(ev["extras"]["jobId"].get<std::string>(), "abc");
+}
+
+// ---- Authorization refresh ----
+
+TEST(auth_failure_dispatches_authorizationRefresh_event) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false, 401, "Unauthorized");
+
+    auto authEvents = h.bridge->eventsNamed("authorizationRefresh");
+    ASSERT_EQ(authEvents.size(), 1u);
+    json ev = json::parse(authEvents[0].json);
+    ASSERT_EQ(ev["status"].get<int>(), 401);
+
+    // Should NOT start backoff retry timer
+    ASSERT_FALSE(h.bridge->syncRetryTimerRunning);
+}
+
+TEST(auth_failure_403_dispatches_authorizationRefresh) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false, 403, "Forbidden");
+
+    auto authEvents = h.bridge->eventsNamed("authorizationRefresh");
+    ASSERT_EQ(authEvents.size(), 1u);
+    ASSERT_FALSE(h.bridge->syncRetryTimerRunning);
+}
+
+TEST(updateAuthorizationHeaders_retries_sync_immediately) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+    ASSERT_TRUE(h.bridge->sendWasCalled);
+    ASSERT_EQ(h.bridge->sendCallCount, 1);
+
+    // Simulate 401
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false, 401, "Unauthorized");
+
+    // JS handler calls updateAuthorizationHeaders with new token
+    json newHeaders = {{"Authorization", "Bearer fresh-token"}};
+    h.core->updateAuthorizationHeaders(newHeaders.dump());
+
+    // Should have retried immediately
+    ASSERT_EQ(h.bridge->sendCallCount, 2);
+    // Verify new headers are used
+    json headers = json::parse(h.bridge->lastSendHeaders);
+    ASSERT_EQ(headers["Authorization"].get<std::string>(), "Bearer fresh-token");
+}
+
+TEST(updateAuthorizationHeaders_without_auth_failure_does_not_retry) {
+    SyncTestHarness h(5);
+    h.insertLocations(3); // below threshold, no sync
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+
+    // Update headers when not awaiting auth refresh — should NOT trigger sync
+    json newHeaders = {{"Authorization", "Bearer token"}};
+    h.core->updateAuthorizationHeaders(newHeaders.dump());
+
+    ASSERT_FALSE(h.bridge->sendWasCalled);
+}
+
+TEST(non_auth_failure_still_uses_backoff) {
+    SyncTestHarness h(5);
+    h.insertLocations(5);
+
+    // 500 error — not auth, should use normal backoff
+    h.core->onSyncComplete(h.bridge->lastSendRequestId, false, 500, "Server Error");
+
+    ASSERT_TRUE(h.bridge->syncRetryTimerRunning);
+    ASSERT_EQ(h.bridge->syncRetryTimerDelay, 10);
+    auto authEvents = h.bridge->eventsNamed("authorizationRefresh");
+    ASSERT_EQ(authEvents.size(), 0u);
+}
+
 int main() {
     return test::run();
 }

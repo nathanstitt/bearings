@@ -13,6 +13,10 @@ export interface Spec extends TurboModule {
   removeGeofence(identifier: string): Promise<boolean>;
   removeGeofences(): Promise<boolean>;
   getGeofences(): Promise<string>;
+  updateAuthorizationHeaders(headersJson: string): Promise<boolean>;
+  getGeofenceEvents(): Promise<string>;
+  getGeofenceEventCount(): Promise<number>;
+  destroyGeofenceEvents(): Promise<boolean>;
   startSchedule(): Promise<string>;
   stopSchedule(): Promise<string>;
   addListener(eventName: string): void;

@@ -106,9 +106,9 @@ class GeomonyPlatformBridge(private val reactContext: ReactApplicationContext) {
         }
     }
 
-    fun notifySyncComplete(requestId: Int, success: Boolean) {
+    fun notifySyncComplete(requestId: Int, success: Boolean, httpStatus: Int = 0, responseText: String = "") {
         if (nativePtr != 0L) {
-            nativeOnSyncComplete(nativePtr, requestId, success)
+            nativeOnSyncComplete(nativePtr, requestId, success, httpStatus, responseText)
         }
     }
 
@@ -143,6 +143,27 @@ class GeomonyPlatformBridge(private val reactContext: ReactApplicationContext) {
     fun getGeofences(): String {
         if (nativePtr == 0L) return "[]"
         return nativeGetGeofences(nativePtr)
+    }
+
+    fun updateAuthorizationHeaders(headersJson: String) {
+        if (nativePtr != 0L) {
+            nativeUpdateAuthorizationHeaders(nativePtr, headersJson)
+        }
+    }
+
+    fun getGeofenceEvents(): String {
+        if (nativePtr == 0L) return "[]"
+        return nativeGetGeofenceEvents(nativePtr)
+    }
+
+    fun getGeofenceEventCount(): Int {
+        if (nativePtr == 0L) return 0
+        return nativeGetGeofenceEventCount(nativePtr)
+    }
+
+    fun destroyGeofenceEvents(): Boolean {
+        if (nativePtr == 0L) return false
+        return nativeDestroyGeofenceEvents(nativePtr)
     }
 
     // --- Callbacks from C++ via JNI ---
@@ -233,8 +254,8 @@ class GeomonyPlatformBridge(private val reactContext: ReactApplicationContext) {
     }
 
     @Suppress("unused")
-    fun onSendHTTPRequest(url: String, jsonPayload: String, requestId: Int) {
-        locationService?.sendHTTPRequest(url, jsonPayload, requestId)
+    fun onSendHTTPRequest(url: String, jsonPayload: String, headersJson: String, requestId: Int) {
+        locationService?.sendHTTPRequest(url, jsonPayload, headersJson, requestId)
     }
 
     @Suppress("unused")
@@ -282,8 +303,12 @@ class GeomonyPlatformBridge(private val reactContext: ReactApplicationContext) {
     private external fun nativeRemoveAllGeofences(ptr: Long): Boolean
     private external fun nativeGetGeofences(ptr: Long): String
     private external fun nativeGetStopOnTerminate(ptr: Long): Boolean
-    private external fun nativeOnSyncComplete(ptr: Long, requestId: Int, success: Boolean)
+    private external fun nativeOnSyncComplete(ptr: Long, requestId: Int, success: Boolean, httpStatus: Int, responseText: String)
     private external fun nativeOnSyncRetryTimerFired(ptr: Long)
+    private external fun nativeUpdateAuthorizationHeaders(ptr: Long, headersJson: String)
+    private external fun nativeGetGeofenceEvents(ptr: Long): String
+    private external fun nativeGetGeofenceEventCount(ptr: Long): Int
+    private external fun nativeDestroyGeofenceEvents(ptr: Long): Boolean
 
     companion object {
         var instance: GeomonyPlatformBridge? = null

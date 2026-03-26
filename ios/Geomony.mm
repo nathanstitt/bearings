@@ -64,7 +64,7 @@
 }
 
 - (NSArray<NSString *> *)supportedEvents {
-    return @[@"location", @"motionchange", @"activitychange", @"geofence", @"schedule", @"sync", @"error"];
+    return @[@"location", @"motionchange", @"activitychange", @"geofence", @"schedule", @"sync", @"http", @"authorizationRefresh", @"error"];
 }
 
 - (void)startObserving {
@@ -154,6 +154,23 @@
     resolve(geofences);
 }
 
+- (void)getGeofenceEvents:(RCTPromiseResolveBlock)resolve
+                   reject:(RCTPromiseRejectBlock)reject {
+    NSString* events = [NSString stringWithUTF8String:_core->getGeofenceEvents().c_str()];
+    resolve(events);
+}
+
+- (void)getGeofenceEventCount:(RCTPromiseResolveBlock)resolve
+                       reject:(RCTPromiseRejectBlock)reject {
+    resolve(@(_core->getGeofenceEventCount()));
+}
+
+- (void)destroyGeofenceEvents:(RCTPromiseResolveBlock)resolve
+                       reject:(RCTPromiseRejectBlock)reject {
+    BOOL result = _core->destroyGeofenceEvents();
+    resolve(@(result));
+}
+
 - (void)startSchedule:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject {
     _locationDelegate.schedulerActive = YES;
@@ -168,6 +185,14 @@
     _core->stopSchedule();
     NSString* state = [NSString stringWithUTF8String:_core->getState().c_str()];
     resolve(state);
+}
+
+- (void)updateAuthorizationHeaders:(NSString *)headersJson
+                            resolve:(RCTPromiseResolveBlock)resolve
+                             reject:(RCTPromiseRejectBlock)reject {
+    std::string headers = [headersJson UTF8String];
+    _core->updateAuthorizationHeaders(headers);
+    resolve(@(YES));
 }
 
 - (void)addListener:(NSString *)eventName {

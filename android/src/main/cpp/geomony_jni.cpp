@@ -30,7 +30,7 @@ public:
         removeAllGeofencesMethod_ = env->GetMethodID(cls, "onRemoveAllGeofences", "()V");
         startScheduleTimerMethod_ = env->GetMethodID(cls, "onStartScheduleTimer", "(I)V");
         cancelScheduleTimerMethod_ = env->GetMethodID(cls, "onCancelScheduleTimer", "()V");
-        sendHTTPRequestMethod_ = env->GetMethodID(cls, "onSendHTTPRequest", "(Ljava/lang/String;Ljava/lang/String;I)V");
+        sendHTTPRequestMethod_ = env->GetMethodID(cls, "onSendHTTPRequest", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
         startSyncRetryTimerMethod_ = env->GetMethodID(cls, "onStartSyncRetryTimer", "(I)V");
         cancelSyncRetryTimerMethod_ = env->GetMethodID(cls, "onCancelSyncRetryTimer", "()V");
     }
@@ -151,14 +151,17 @@ public:
 
     void sendHTTPRequest(const std::string& url,
                          const std::string& jsonPayload,
+                         const std::string& headersJson,
                          int requestId) override {
         JNIEnv* env = getEnv();
         if (!env) return;
         jstring jUrl = env->NewStringUTF(url.c_str());
         jstring jPayload = env->NewStringUTF(jsonPayload.c_str());
-        env->CallVoidMethod(bridge_, sendHTTPRequestMethod_, jUrl, jPayload, (jint)requestId);
+        jstring jHeaders = env->NewStringUTF(headersJson.c_str());
+        env->CallVoidMethod(bridge_, sendHTTPRequestMethod_, jUrl, jPayload, jHeaders, (jint)requestId);
         env->DeleteLocalRef(jUrl);
         env->DeleteLocalRef(jPayload);
+        env->DeleteLocalRef(jHeaders);
     }
 
     void startSyncRetryTimer(int delaySeconds) override {
@@ -421,13 +424,41 @@ Java_com_geomony_GeomonyPlatformBridge_nativeGetStopOnTerminate(JNIEnv*, jobject
 }
 
 JNIEXPORT void JNICALL
-Java_com_geomony_GeomonyPlatformBridge_nativeOnSyncComplete(JNIEnv*, jobject, jlong ptr, jint requestId, jboolean success) {
-    reinterpret_cast<geomony::GeomonyCore*>(ptr)->onSyncComplete(requestId, success);
+Java_com_geomony_GeomonyPlatformBridge_nativeOnSyncComplete(JNIEnv* env, jobject, jlong ptr,
+    jint requestId, jboolean success, jint httpStatus, jstring responseText) {
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
+    const char* resp = env->GetStringUTFChars(responseText, nullptr);
+    core->onSyncComplete(requestId, success, httpStatus, resp);
+    env->ReleaseStringUTFChars(responseText, resp);
 }
 
 JNIEXPORT void JNICALL
 Java_com_geomony_GeomonyPlatformBridge_nativeOnSyncRetryTimerFired(JNIEnv*, jobject, jlong ptr) {
     reinterpret_cast<geomony::GeomonyCore*>(ptr)->onSyncRetryTimerFired();
+}
+
+JNIEXPORT void JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeUpdateAuthorizationHeaders(JNIEnv* env, jobject, jlong ptr, jstring headersJson) {
+    auto core = reinterpret_cast<geomony::GeomonyCore*>(ptr);
+    const char* str = env->GetStringUTFChars(headersJson, nullptr);
+    core->updateAuthorizationHeaders(str);
+    env->ReleaseStringUTFChars(headersJson, str);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeGetGeofenceEvents(JNIEnv* env, jobject, jlong ptr) {
+    auto events = reinterpret_cast<geomony::GeomonyCore*>(ptr)->getGeofenceEvents();
+    return env->NewStringUTF(events.c_str());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeGetGeofenceEventCount(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->getGeofenceEventCount();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_geomony_GeomonyPlatformBridge_nativeDestroyGeofenceEvents(JNIEnv*, jobject, jlong ptr) {
+    return reinterpret_cast<geomony::GeomonyCore*>(ptr)->destroyGeofenceEvents();
 }
 
 } // extern "C"

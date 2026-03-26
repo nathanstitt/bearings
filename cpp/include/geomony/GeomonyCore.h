@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Geofence.h"
 #include "GeofenceStore.h"
+#include "GeofenceEventStore.h"
 #include "Location.h"
 #include "LocationStore.h"
 #include "PlatformBridge.h"
@@ -50,6 +51,11 @@ public:
     std::string getGeofences();
     void onGeofenceEvent(const std::string& identifier, const std::string& action);
 
+    // Geofence event store API
+    std::string getGeofenceEvents();
+    int getGeofenceEventCount();
+    bool destroyGeofenceEvents();
+
     // Schedule API
     void startSchedule();
     void stopSchedule();
@@ -57,7 +63,9 @@ public:
                               int hour, int minute, int second);
 
     // Sync callbacks from platform layer
-    void onSyncComplete(int requestId, bool success);
+    void onSyncComplete(int requestId, bool success,
+                        int httpStatus = 0, const std::string& responseText = "");
+    void updateAuthorizationHeaders(const std::string& headersJson);
     void onSyncRetryTimerFired();
     void onConnectivityChange(bool connected);
 
@@ -82,6 +90,7 @@ private:
     Config config_;
     LocationStore store_;
     GeofenceStore geofenceStore_;
+    GeofenceEventStore geofenceEventStore_;
     bool tracking_ = false;
     bool configured_ = false;
 
@@ -104,8 +113,10 @@ private:
     int nextRequestId_ = 1;
     int activeRequestId_ = 0;
     std::vector<int64_t> pendingSyncIds_;
+    std::vector<int64_t> pendingGeofenceEventSyncIds_;
     int syncRetryCount_ = 0;
     bool syncRetryTimerRunning_ = false;
+    bool awaitingAuthRefresh_ = false;
     bool terminated_ = false;
 };
 
