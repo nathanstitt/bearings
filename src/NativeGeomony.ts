@@ -23,4 +23,4 @@ export interface Spec extends TurboModule {
   removeListeners(count: number): void;
 }
 
-export default TurboModuleRegistry.get<Spec>('Geomony');
+export default TurboModuleRegistry?.get<Spec>('Geomony') ?? null;
