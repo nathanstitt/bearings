@@ -15,17 +15,22 @@ set(GEOMONY_SOURCES
     src/GeofenceEventRecord.cpp
     src/GeofenceEventStore.cpp
     src/Logger.cpp
-    vendor/geomony_sqlite3/sqlite3.c
 )
 
-set(GEOMONY_COMPILE_DEFS
-    SQLITE_THREADSAFE=2
-    SQLITE_DEFAULT_MEMSTATUS=0
-    SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
-    SQLITE_LIKE_DOESNT_MATCH_BLOBS
-    SQLITE_OMIT_DEPRECATED
-    SQLITE_OMIT_SHARED_CACHE
-)
+set(GEOMONY_COMPILE_DEFS "")
+
+if(NOT APPLE)
+    # Android and desktop tests: vendor sqlite3 (iOS uses system libsqlite3)
+    list(APPEND GEOMONY_SOURCES vendor/geomony_sqlite3/sqlite3.c)
+    list(APPEND GEOMONY_COMPILE_DEFS
+        SQLITE_THREADSAFE=2
+        SQLITE_DEFAULT_MEMSTATUS=0
+        SQLITE_DEFAULT_WAL_SYNCHRONOUS=1
+        SQLITE_LIKE_DOESNT_MATCH_BLOBS
+        SQLITE_OMIT_DEPRECATED
+        SQLITE_OMIT_SHARED_CACHE
+    )
+endif()
 
 if(ANDROID)
     # Android: build shared library with JNI bindings
@@ -35,7 +40,7 @@ if(ANDROID)
     )
     target_link_libraries(geomony_core log)
 else()
-    # iOS / other: static library
+    # iOS / desktop: static library
     add_library(geomony_core STATIC ${GEOMONY_SOURCES})
 endif()
 
@@ -43,6 +48,12 @@ target_include_directories(geomony_core
     PUBLIC include
     PRIVATE vendor
 )
+
+if(APPLE)
+    # Link system sqlite3 on macOS/iOS
+    find_library(SQLITE3_LIB sqlite3)
+    target_link_libraries(geomony_core ${SQLITE3_LIB})
+endif()
 
 target_compile_definitions(geomony_core PRIVATE ${GEOMONY_COMPILE_DEFS})
 

@@ -1,6 +1,10 @@
 #include "geomony/GeofenceStore.h"
 #include "geomony/Logger.h"
+#ifdef __APPLE__
+#include <sqlite3.h>
+#else
 #include "geomony_sqlite3/sqlite3.h"
+#endif
 
 namespace geomony {
 

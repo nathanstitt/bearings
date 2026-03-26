@@ -13,13 +13,13 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => min_ios_version_supported }
   s.source       = { :git => "https://github.com/nathanstitt/geomony.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm,swift,cpp}", "cpp/src/**/*.cpp", "cpp/vendor/**/*.c"
+  s.source_files = "ios/**/*.{h,m,mm,swift,cpp}", "cpp/src/**/*.cpp"
   s.private_header_files = "ios/**/*.h", "cpp/include/**/*.h"
   s.frameworks   = "CoreLocation", "CoreMotion"
+  s.libraries    = "sqlite3"
 
   s.pod_target_xcconfig = {
     'HEADER_SEARCH_PATHS' => '"$(PODS_TARGET_SRCROOT)/cpp/include" "$(PODS_TARGET_SRCROOT)/cpp/vendor"',
-    'GCC_PREPROCESSOR_DEFINITIONS' => 'SQLITE_THREADSAFE=2 SQLITE_DEFAULT_MEMSTATUS=0 SQLITE_OMIT_DEPRECATED SQLITE_OMIT_SHARED_CACHE',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17'
   }
 
