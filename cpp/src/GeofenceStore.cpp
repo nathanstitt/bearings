@@ -1,6 +1,6 @@
 #include "geomony/GeofenceStore.h"
 #include "geomony/Logger.h"
-#include "sqlite3.h"
+#include "geomony_sqlite3/sqlite3.h"
 
 namespace geomony {
 

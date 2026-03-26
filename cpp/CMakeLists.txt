@@ -15,7 +15,7 @@ set(GEOMONY_SOURCES
     src/GeofenceEventRecord.cpp
     src/GeofenceEventStore.cpp
     src/Logger.cpp
-    vendor/sqlite3/sqlite3.c
+    vendor/geomony_sqlite3/sqlite3.c
 )
 
 set(GEOMONY_COMPILE_DEFS
@@ -41,7 +41,6 @@ endif()
 
 target_include_directories(geomony_core
     PUBLIC include
-    PRIVATE vendor/sqlite3
     PRIVATE vendor
 )
 
